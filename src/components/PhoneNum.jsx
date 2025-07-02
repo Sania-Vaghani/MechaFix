@@ -62,7 +62,7 @@ const PhoneNum = () => {
                 <CustomText style={styles.countryCodeText}>+91</CustomText>
               </View>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { fontFamily: 'Poppins', fontWeight: 'bold', fontSize: 18, color: '#333' }]}
                 placeholder="Enter your mobile number"
                 placeholderTextColor="#9E9E9E"
                 keyboardType="phone-pad"
@@ -77,6 +77,26 @@ const PhoneNum = () => {
             <CustomText style={styles.termsText}>
               By continuing, you agree to our <CustomText style={{ color: '#E53935', textDecorationLine: 'underline' }}>Terms</CustomText> & <CustomText style={{ color: '#E53935', textDecorationLine: 'underline' }}>Privacy Policy</CustomText>.
             </CustomText>
+            {/* Car illustration at the bottom of the card (clean, premium style) */}
+            <View style={{ alignItems: 'center', marginTop: 30, minHeight: 70 }}>
+              {/* Car */}
+              <View style={{ width: 90, height: 48, position: 'relative', alignSelf: 'center' }}>
+                {/* Car body */}
+                <View style={{ position: 'absolute', bottom: 10, width: 90, height: 24, backgroundColor: '#D9534F', borderRadius: 4 }} />
+                {/* Car roof */}
+                <View style={{ position: 'absolute', top: 0, left: 15, width: 60, height: 18, backgroundColor: '#9C9C9C', borderTopLeftRadius: 6, borderTopRightRadius: 6 }} />
+                {/* Car windows */}
+                <View style={{ position: 'absolute', top: 3, left: 21, width: 20, height: 10, backgroundColor: '#FFF', borderRadius: 2, opacity: 0.85, borderWidth: 1, borderColor: '#e3f0ff' }} />
+                <View style={{ position: 'absolute', top: 3, left: 47, width: 20, height: 10, backgroundColor: '#FFF', borderRadius: 2, opacity: 0.85, borderWidth: 1, borderColor: '#e3f0ff' }} />
+                {/* Wheels */}
+                <View style={{ position: 'absolute', bottom: 0, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: '#333', borderWidth: 2, borderColor: '#FFF' }} />
+                  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: '#333', borderWidth: 2, borderColor: '#FFF' }} />
+                </View>
+              </View>
+              {/* Road */}
+              <View style={{ width: 90, height: 10, backgroundColor: '#bbb', borderRadius: 4, marginTop: 2, marginBottom: 2, alignSelf: 'center' }} />
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -95,7 +115,7 @@ const styles = StyleSheet.create({
   },
   logoTopContainer: {
     position: 'absolute',
-    top: 75,
+    top: 90,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -131,8 +151,6 @@ const styles = StyleSheet.create({
   },
   illustrationContainer: {
     alignItems: 'center',
-    marginTop: 48,
-    marginBottom: 18,
     zIndex: 2,
   },
   illustrationEmoji: {
@@ -149,6 +167,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingHorizontal: 24,
     paddingVertical: 56,
+    marginTop:90,
     marginHorizontal: 18,
     shadowColor: '#E53935',
     shadowOffset: { width: 0, height: 8 },
@@ -157,17 +176,17 @@ const styles = StyleSheet.create({
     elevation: 6,
     alignItems: 'center',
     minWidth: 320,
-    minHeight: 340,
+    minHeight: 490,
     width: '100%',
     zIndex: 2,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#212121',
     textAlign: 'center',
     fontFamily: 'Poppins',
-    marginBottom: 6,
+    marginBottom: 18,
   },
   subtitle: {
     fontSize: 15,
@@ -189,15 +208,14 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   countryCodeBox: {
-    backgroundColor: '#f3e7e9',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
     marginRight: 8,
   },
   countryCodeText: {
-    fontSize: 15,
-    color: '#E53935',
+    fontSize: 18,
+    color: '#333',
     fontFamily: 'Poppins',
     fontWeight: 'bold',
   },
@@ -220,13 +238,11 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 10,
     alignItems: 'center',
-    marginTop: 10,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
-    minWidth: 180,
     width: '100%',
   },
   primaryButtonText: {
@@ -239,7 +255,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#757575',
     textAlign: 'center',
-    marginTop: 14,
+    marginTop: 30,
     fontFamily: 'Poppins',
     marginBottom: 2,
   },
