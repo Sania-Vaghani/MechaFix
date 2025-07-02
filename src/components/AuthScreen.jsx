@@ -169,7 +169,6 @@ const styles = StyleSheet.create({
     slideTitle: {
       fontSize: 29,
       fontWeight: 'bold',
-      fontStyle: 'italic',
       color: '#212121',
       textAlign: 'center',
       paddingHorizontal: 20,
@@ -190,10 +189,10 @@ const styles = StyleSheet.create({
       alignSelf: 'center',
     },
     dot: {
-      height: 10,
+      height: 5,
       borderRadius: 5,
       backgroundColor: '#E53935',
-      marginHorizontal: 4,
+      marginHorizontal: 6,
     },
     formContainer: {
       flex: 1,
@@ -206,7 +205,7 @@ const styles = StyleSheet.create({
       fontWeight: 'bold',
       color: '#E53935',
       textAlign: 'center',
-      marginBottom: 15,
+      marginBottom: 10,
       fontFamily: 'Poppins-Regular',
     },
     phoneInputContainer: {

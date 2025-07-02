@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import SplashScreen from './src/components/SplashScreen';
 import AuthScreen from './src/components/AuthScreen';
+import OtpScreen from './src/components/OtpScreen';
+import UserSignUp from './src/components/UserSignUp';
+import PhoneNum from './src/components/PhoneNum';
 
 const App = () => {
   const [isSplashVisible, setIsSplashVisible] = useState(true);
@@ -16,7 +19,10 @@ const App = () => {
 
   return (
     <View style={styles.container}>
-      {isSplashVisible ? <SplashScreen /> : <AuthScreen />}
+      {/* {isSplashVisible ? <SplashScreen /> : <AuthScreen />} */}
+      {/* <OtpScreen/> */}
+      {/* <UserSignUp/> */}
+      <PhoneNum/>
     </View>
   );
 };
