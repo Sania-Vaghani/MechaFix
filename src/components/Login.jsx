@@ -45,6 +45,7 @@ const UserSignUp = () => {
       }),
     ]).start(() => {
       // Handle sign up logic here
+      navigation.navigate('MainTabs');
     });
   };
 

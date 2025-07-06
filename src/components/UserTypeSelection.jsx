@@ -77,7 +77,7 @@ const UserTypeSelection = ({ navigation }) => {
               activeOpacity={0.8}
             >
               <View style={styles.cardContent}>
-                <View style={[styles.iconContainer, { backgroundColor: '#E53935' }]}>
+                <View style={[styles.iconContainer, { backgroundColor: '#x' }]}>
                   <CustomText style={styles.iconText}>🔧</CustomText>
                 </View>
                 <CustomText style={styles.cardTitle}>I'm a Mechanic</CustomText>
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 16,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#A7C9FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
