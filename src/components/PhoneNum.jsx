@@ -62,7 +62,7 @@ const PhoneNum = () => {
                 <CustomText style={styles.countryCodeText}>+91</CustomText>
               </View>
               <TextInput
-                style={[styles.input, { fontFamily: 'Poppins', fontWeight: 'bold', fontSize: 18, color: '#333' }]}
+                style={[styles.input, { fontFamily: 'Poppins', fontWeight: 'normal', fontSize: 18, color: '#333' }]}
                 placeholder="Enter your mobile number"
                 placeholderTextColor="#9E9E9E"
                 keyboardType="phone-pad"
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     color: '#333',
     fontSize: 30,
     fontWeight: 'bold',
-    fontFamily: 'Poppins',
+    fontFamily: 'Cormorant-Bold',
     marginLeft: 10,
     letterSpacing: 1,
     alignSelf: 'center',
@@ -165,8 +165,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: 'rgba(255,255,255,0.97)',
     borderRadius: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 56,
+    paddingHorizontal: 32,
+    paddingVertical: 64,
     marginTop:90,
     marginHorizontal: 18,
     shadowColor: '#E53935',
@@ -175,8 +175,8 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 6,
     alignItems: 'center',
-    minWidth: 320,
-    minHeight: 490,
+    minWidth: 340,
+    minHeight: 520,
     width: '100%',
     zIndex: 2,
   },
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#212121',
     textAlign: 'center',
-    fontFamily: 'Poppins',
+    fontFamily: 'Cormorant-Bold',
     marginBottom: 18,
   },
   subtitle: {

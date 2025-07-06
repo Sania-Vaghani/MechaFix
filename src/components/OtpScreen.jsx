@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import CustomText from '../../Components/CustomText';
+import { useNavigation } from '@react-navigation/native';
 
 const OtpScreen = () => {
+  const navigation = useNavigation();
   const [otp, setOtp] = useState(['', '', '', '']);
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const inputs = [useRef(null), useRef(null), useRef(null), useRef(null)];
@@ -41,6 +43,7 @@ const OtpScreen = () => {
 
   const handleContinue = () => {
     // Handle OTP submission logic here
+    navigation.navigate('CreatePassword');
   };
 
   const getInputBorderColor = idx => '#E53935';
@@ -124,7 +127,7 @@ const OtpScreen = () => {
           <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#D9534F', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
             <CustomText style={{ color: '#FFFFFF', fontSize: 28, fontWeight: 'bold', fontFamily: 'Poppins' }}>M</CustomText>
           </View>
-          <CustomText style={{ fontSize: 30, fontWeight: 'bold', color: '#333', fontFamily: 'Poppins', letterSpacing: 1 }}>MechaFix</CustomText>
+          <CustomText style={{ fontSize: 40, color: '#333', fontFamily: 'Cormorant-Bold', letterSpacing: 1 }}>MechaFix</CustomText>
         </View>
         {/* Add spacing between logo and illustration */}
         <View style={{ height: 10 }} />
@@ -286,11 +289,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 30,
     color: '#212121',
     textAlign: 'center',
-    fontFamily: 'Poppins',
+    fontFamily: 'Cormorant-Bold',
     marginBottom: 10,
   },
   subtitle: {
@@ -341,7 +343,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     fontFamily: 'Poppins',
   },

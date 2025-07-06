@@ -1,36 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import * as React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
 import SplashScreen from './src/components/SplashScreen';
 import AuthScreen from './src/components/AuthScreen';
 import OtpScreen from './src/components/OtpScreen';
-import UserSignUp from './src/components/UserSignUp';
+import Login from './src/components/Login';
 import PhoneNum from './src/components/PhoneNum';
+import UserTypeSelection from './src/components/UserTypeSelection';
+import SignUp from './src/components/SignUp';
+import CreatePassword from './src/components/CreatePassword';
+import { UserTypeProvider } from './src/context/UserTypeContext';
 
-const App = () => {
-  const [isSplashVisible, setIsSplashVisible] = useState(true);
+const Stack = createStackNavigator();
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsSplashVisible(false);
-    }, 3000); // 3 seconds
-
-    return () => clearTimeout(timer);
-  }, []);
-
+export default function App() {
   return (
-    <View style={styles.container}>
-      {/* {isSplashVisible ? <SplashScreen /> : <AuthScreen />} */}
-      {/* <OtpScreen/> */}
-      {/* <UserSignUp/> */}
-      <PhoneNum/>
-    </View>
+    <UserTypeProvider>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Splash" component={SplashScreen} />
+          <Stack.Screen name="UserTypeSelection" component={UserTypeSelection} />
+          <Stack.Screen name="Auth" component={AuthScreen} />
+          <Stack.Screen name="Login" component={Login} />
+          <Stack.Screen name="SignUp" component={SignUp} />
+          <Stack.Screen name="Otp" component={OtpScreen} />
+          <Stack.Screen name="PhoneNum" component={PhoneNum} />
+          <Stack.Screen name="CreatePassword" component={CreatePassword} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </UserTypeProvider>
   );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
-
-export default App;
+}

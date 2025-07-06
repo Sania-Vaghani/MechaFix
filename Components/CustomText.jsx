@@ -21,7 +21,10 @@ function getPoppinsFontFamily(style = {}) {
 }
 
 function CustomText({ style, children, ...props }) {
-    const fontFamily = getPoppinsFontFamily(Array.isArray(style) ? Object.assign({}, ...style) : style);
+    // Flatten style array if needed
+    const flatStyle = Array.isArray(style) ? Object.assign({}, ...style) : style || {};
+    // Use fontFamily from style if present, otherwise use Poppins mapping
+    const fontFamily = flatStyle.fontFamily || getPoppinsFontFamily(flatStyle);
     return (
         <Text style={[style, { fontFamily }]} {...props}>
             {children}

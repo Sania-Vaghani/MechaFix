@@ -167,12 +167,11 @@ const styles = StyleSheet.create({
       marginTop: 50,
     },
     slideTitle: {
-      fontSize: 29,
-      fontWeight: 'bold',
+      fontSize: 35,
       color: '#212121',
       textAlign: 'center',
       paddingHorizontal: 20,
-      fontFamily: 'Poppins',
+      fontFamily: 'Cormorant-Bold',
     },
     slideSubtitle: {
       fontSize: 16,
