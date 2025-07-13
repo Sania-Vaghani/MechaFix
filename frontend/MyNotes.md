@@ -1,0 +1,1 @@
+> View here act as div just like html
