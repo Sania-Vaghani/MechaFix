@@ -2,7 +2,6 @@ import * as React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import SplashScreen from './src/components/SplashScreen';
-import AuthScreen from './src/components/AuthScreen';
 import OtpScreen from './src/components/OtpScreen';
 import Login from './src/components/Login';
 import PhoneNum from './src/components/PhoneNum';
@@ -49,7 +48,6 @@ export default function App() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Splash" component={SplashScreen} />
           <Stack.Screen name="UserTypeSelection" component={UserTypeSelection} />
-          <Stack.Screen name="Auth" component={AuthScreen} />
           <Stack.Screen name="Login" component={Login} />
           <Stack.Screen name="MainTabs" component={MainTabNavigator} />
           <Stack.Screen name="SignUp" component={SignUp} />
