@@ -147,6 +147,11 @@
         "tag": "fallback",
         "patterns": ["", "unknown", "not sure", "what?"],
         "responses": ["I'm here to help with roadside assistance. Can you rephrase your question?"]
+      },
+      {
+        "tag": "repair",
+        "patterns": ["repair brake"],
+        "responses": ["Connect to our Mechafix mechanics."]
       }
     ]
   }

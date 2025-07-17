@@ -10,6 +10,9 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.hashers import check_password
 from django.core.mail import send_mail
 from django.core.cache import cache
+import jwt
+from django.conf import settings
+from django.db import connection
 
 def is_valid_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
@@ -146,3 +149,27 @@ def verify_otp(request):
         # OTP is correct, delete it
         cache.delete(f"otp_{email}")
         return JsonResponse({'message': 'OTP verified successfully!'})
+    
+@csrf_exempt
+def user_me(request):
+    if request.method == 'GET':
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if not auth_header.startswith('Bearer '):
+            return JsonResponse({'error': 'Authorization header missing or invalid'}, status=401)
+        token = auth_header.split(' ')[1]
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        except Exception as e:
+            return JsonResponse({'error': 'Invalid token'}, status=401)
+        user_type = payload.get('user_type')
+        username = payload.get('username')
+        db = connection.cursor().db_conn
+        collection = 'auth_users' if user_type == 'user' else 'auth_mech'
+        user = db[collection].find_one({'username': username})
+        if not user:
+            return JsonResponse({'error': 'User not found'}, status=404)
+        # Remove sensitive info
+        user.pop('password', None)
+        user['_id'] = str(user['_id'])
+        return JsonResponse(user)
+    return JsonResponse({'error': 'GET required'}, status=405)

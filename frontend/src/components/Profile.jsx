@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Linking, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import API from '../services/api'; // your axios instance
 import user2Icon from '../images/user2.png';
 import settingIcon from '../images/setting.png';
 import emergencyIcon from '../images/emergency-call.png';
@@ -14,6 +16,29 @@ import { useNavigation } from '@react-navigation/native';
 
 const Profile = () => {
   const navigation = useNavigation();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = await AsyncStorage.getItem('jwtToken');
+      const userType = await AsyncStorage.getItem('userType');
+      console.log('Token:', token, 'UserType:', userType);
+      if (token && userType === 'user') {
+        try {
+          const res = await API.get('users/me/', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          console.log('User data:', res.data);
+          setUser(res.data);
+        } catch (err) {
+          console.log('Failed to fetch user profile', err);
+          Alert.alert('Error', 'Failed to fetch user profile: ' + (err?.message || 'Unknown error'));
+        }
+      }
+    };
+    fetchProfile();
+  }, []);
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -37,10 +62,10 @@ const Profile = () => {
           <View style={styles.avatarCircle}>
             <Image source={user2Icon} style={styles.avatar} />
           </View>
-          <Text style={styles.profileName}>John Doe</Text>
+          <Text style={styles.profileName}>{user ? user.username : 'Loading...'}</Text>
           <TouchableOpacity
             onPress={async () => {
-              const phoneNumber = '+919876543210';
+              const phoneNumber = user ? user.phone : '';
               const url = `tel:${phoneNumber}`;
               const supported = await Linking.canOpenURL(url);
               if (supported) {
@@ -51,9 +76,11 @@ const Profile = () => {
             }}
             activeOpacity={0.7}
           >
-            <Text style={[styles.profilePhone, { color: '#2563EB', textDecorationLine: 'underline' }]}>+91 9876543210</Text>
+            <Text style={[styles.profilePhone, { color: '#2563EB'}]}>
+              {user ? `+91 ${user.phone}` : ''}
+            </Text>
           </TouchableOpacity>
-          <Text style={styles.profileEmail}>john.doe@email.com</Text>
+          <Text style={styles.profileEmail}>{user ? user.email : ''}</Text>
         </View>
         {/* Options Card */}
         <View style={styles.optionsCard}>

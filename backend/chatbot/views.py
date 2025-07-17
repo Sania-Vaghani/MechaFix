@@ -1,3 +1,6 @@
+from django.shortcuts import render
+
+# Create your views here.
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
@@ -20,4 +23,4 @@ def chatbot_view(request):
             return JsonResponse({"error": str(e)}, status=500)
     elif request.method == "GET":
         return JsonResponse({"message": "Chatbot endpoint is working. Use POST to chat."})
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return JsonResponse({"error": "Method not allowed"},status=405)
