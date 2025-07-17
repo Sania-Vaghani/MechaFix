@@ -17,6 +17,8 @@ import accumulatorIcon from '../images/accumulator.png';
 import microphoneIcon from '../images/microphone.png';
 import boltIcon from '../images/bolt.png';
 import messageIcon from '../images/message.png';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import API from '../services/api';
 
 const serviceIcons = {
   breakdown: require('../images/img1.png'),
@@ -93,6 +95,26 @@ const UserHome = ({
     }
   }, [dropdownOpen, filteredMechanics.length, search]);
 
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = await AsyncStorage.getItem('jwtToken');
+      const userType = await AsyncStorage.getItem('userType');
+      if (token && userType === 'user') {
+        try {
+          const res = await API.get('users/me/', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setUser(res.data);
+        } catch (err) {
+          console.log('Failed to fetch user profile', err);
+        }
+      }
+    };
+    fetchProfile();
+  }, []);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#F6F8FF' }}>
       {/* Search Overlay for blur/black transparent effect */}
@@ -122,7 +144,9 @@ const UserHome = ({
           <Image source={user2Icon} style={styles.avatar} />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[styles.greeting, { color: theme.text }]}>Hello, Saniya</Text>
+              <Text style={[styles.greeting, { color: theme.text }]}>
+                {user ? `Hello, ${user.username}` : 'Hello!'}
+              </Text>
               <Image source={hiIcon} style={{ width: 38, height: 38, marginLeft: 6, marginTop: 2 }} />
             </View>
             <Text style={[styles.subGreeting, { color: theme.textSecondary }]}>Welcome back!</Text>
