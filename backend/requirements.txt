@@ -5,3 +5,6 @@ dnspython
 PyJWT
 django-cors-headers
 twilio
+nltk==3.8.1
+textblob==0.18.0
+rapidfuzz

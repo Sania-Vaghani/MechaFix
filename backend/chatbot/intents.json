@@ -1,0 +1,152 @@
+{
+    "intents": [
+      {
+        "tag": "greeting",
+        "patterns": ["hi", "hello", "hey", "good morning", "good evening"],
+        "responses": ["Hello! Welcome to MechaFix. How can I help you today?"]
+      },
+      {
+        "tag": "car_broke_down",
+        "patterns": ["my car broke down", "vehicle broke down", "my car stopped", "my car is not starting"],
+        "responses": ["I'm sorry to hear that. Please share your location, and we'll connect you to the nearest mechanic."]
+      },
+      {
+        "tag": "find_mechanic",
+        "patterns": ["find mechanic", "nearest mechanic", "mechanic near me", "locate mechanic"],
+        "responses": ["Sure, I can help with that. Please enable GPS so I can locate mechanics near you."]
+      },
+      {
+        "tag": "arrival_time",
+        "patterns": ["how long will it take", "arrival time", "ETA of mechanic", "when will mechanic come"],
+        "responses": ["Once assigned, the mechanic's estimated arrival time will be visible on the live map."]
+      },
+      {
+        "tag": "payment",
+        "patterns": ["how to pay", "payment options", "pay bill", "pay for service"],
+        "responses": ["You can pay securely using UPI, credit/debit card, or MechaFix Wallet."]
+      },
+      {
+        "tag": "data_privacy",
+        "patterns": ["is my data safe", "data privacy", "privacy policy", "data protection"],
+        "responses": ["Yes, we use end-to-end encryption and follow GDPR-compliant data policies."]
+      },
+      {
+        "tag": "need_help",
+        "patterns": ["i need help", "need assistance", "please help", "help me", "i'm stuck","help"],
+        "responses": [
+          "Sure, I'm here to help! Please tell me your current location or issue, and I'll connect you with a nearby mechanic.",
+          "We have got you covered. Please provide more details like your location or problem so we can assist quickly."
+        ]
+      },
+      { 
+        "tag": "thanks",
+        "patterns": ["thank you", "thanks", "thanks a lot", "appreciate it"],
+        "responses": ["You're welcome! Drive safe. 😊"]
+      },
+      {
+        "tag": "danger",
+        "patterns": ["danger", "emergency", "risk","sos" ],
+        "responses": ["Push SOS button !!"]
+      },
+      {
+        "tag": "vehicle_emergency",
+        "patterns": [
+          "battery overheat",
+          "engine releasing smoke",
+          "burning smell",
+          "car overheating", 
+          "smoke from engine",
+          "vehicle on fire",
+          "steam from bonnet",
+          "engine smells burnt"
+        ],
+        "responses": [
+          "This sounds like a critical issue. Please turn off your engine immediately and wait for assistance.",
+          "Warning signs like these could be dangerous. Stay safe and don't try to drive.Connect to nearby mechanic."
+        ]
+      },
+      {
+        "tag": "battery_issue",
+        "patterns": [
+          "battery dead",
+          "battery not working",
+          "car won't start",
+          "vehicle not turning on",
+          "battery failure",
+          "battery drained"
+        ],
+        "responses": [
+          "It looks like your battery might be drained. Please stay near your vehicle.",
+          "Don't worry — this happens a lot.Connect nearby mechanic"
+        ]
+      },
+      {
+        "tag": "engine_problem",
+        "patterns": [
+          "engine problem",
+          "engine failure",
+          "engine fail",
+          "car engine issue",
+          "strange noise from engine",
+          "engine stalled"
+        ],
+        "responses": [
+          "Engine issues can be serious. Please stay safe and avoid restarting the car.Try connecting a technician"]
+      },
+      {
+        "tag": "flat_tire",
+        "patterns": [
+          "flat tire",
+          "tyre puncture",
+          "my tire burst",
+          "tire is leaking air",
+          "punctured wheel",
+          "my wheel is damaged"
+        ],
+        "responses": [
+      "Sounds like a flat tire issue. You can use the MechaFix app to find and call a nearby mechanic for tire repair.",
+      "Tire problems are common. Please open the app's breakdown section to locate the nearest mechanic and contact them directly."
+    ]
+      },
+      {
+        "tag": "brake_failure",
+        "patterns": [
+          "brake failure",
+          "brake fail",
+          "brakes not working",
+          "car not stopping",
+          "brakes jammed",
+          "emergency braking issue"
+        ],
+        "responses": [
+          "Brake issues are dangerous. If you haven't already, stop the vehicle safely and wait.",
+          "Please don't drive further. Navigate to breakdown section of the app"
+        ]
+      },
+      {
+        "tag": "stuck_weather",
+        "patterns": [
+          "stuck in rain",
+          "my car is stuck in flood",
+          "heavy rain issue",
+          "vehicle submerged",
+          "can't move car in rain",
+          "stuck due to water"
+        ],
+        "responses": [
+          "Your safety is our priority. If you're stuck in rain or water, please stay inside and wait for our rescue assistance team.",
+          "That sounds like a flood-related emergency. A rescue-ready mechanic is being routed to your GPS location now."
+        ]
+      },    
+      {
+        "tag": "goodbye",
+        "patterns": ["bye", "goodbye", "see you", "talk later"],
+        "responses": ["Goodbye! Reach out anytime you need roadside help."]
+      },
+      {
+        "tag": "fallback",
+        "patterns": ["", "unknown", "not sure", "what?"],
+        "responses": ["I'm here to help with roadside assistance. Can you rephrase your question?"]
+      }
+    ]
+  }

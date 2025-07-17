@@ -46,17 +46,41 @@ const Messages = () => {
     }
   }, [messages]);
 
-  const sendMessage = (text) => {
+  const sendMessage = async(text) => {
     if (!text.trim()) return;
     const now = new Date();
     const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setMessages(prev => [...prev, { from: 'user', text, time }]);
     setInput('');
     setChatStarted(true);
+
+     try {
+    const res = await fetch('http://10.0.2.2:8000/chatbot/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text }),
+    });
+    const data = await res.json();
+
+    const botReply = {
+      from: 'mechanic',
+      text: data.reply,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setMessages(prev => [...prev, botReply]);
+  } catch (err) {
+    console.error(err);
+    setMessages(prev => [...prev, {
+      from: 'mechanic',
+      text: 'Sorry! Something went wrong.',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }]);
+  }
+
     // Simulate mechanic reply
-    setTimeout(() => {
-      setMessages(prev => [...prev, { from: 'mechanic', text: 'Thank you for your message. I\'m on it!', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
-    }, 1200);
+    // setTimeout(() => {
+    //   setMessages(prev => [...prev, { from: 'mechanic', text: 'Thank you for your message. I\'m on it!', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+    // }, 1200);
   };
 
   const handleDefaultQuestion = (q) => {
@@ -94,31 +118,59 @@ const Messages = () => {
           contentContainerStyle={{ padding: 18, paddingBottom: 80 }}
           showsVerticalScrollIndicator={false}
         >
-          {messages.map((msg, idx) => (
-            <View
-              key={idx}
-              style={[
-                styles.bubbleRow,
-                msg.from === 'user' ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' },
-              ]}
-            >
+          {messages.map((msg, idx) => {
+            // Helper: check for triggers in bot response
+            const isBot = msg.from === 'mechanic';
+            const lowerText = msg.text.toLowerCase();
+            const showSOS = isBot && (lowerText.includes('sos') || lowerText.includes('emergency'));
+            const showBreakdown = isBot && (lowerText.includes('breakdown') || lowerText.includes('mechanic'));
+            return (
               <View
+                key={idx}
                 style={[
-                  styles.bubble,
-                  msg.from === 'user' ? styles.userBubble : styles.mechanicBubble,
+                  styles.bubbleRow,
+                  msg.from === 'user' ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' },
                 ]}
               >
-                <Text style={[
-                  styles.bubbleText,
-                  msg.from === 'user' ? styles.userBubbleText : styles.mechanicBubbleText,
-                ]}>{msg.text}</Text>
-                <Text style={[
-                  styles.bubbleTime,
-                  msg.from === 'user' ? styles.userBubbleTime : styles.mechanicBubbleTime
-                ]}>{msg.time}</Text>
+                <View
+                  style={[
+                    styles.bubble,
+                    msg.from === 'user' ? styles.userBubble : styles.mechanicBubble,
+                  ]}
+                >
+                  <Text style={[
+                    styles.bubbleText,
+                    msg.from === 'user' ? styles.userBubbleText : styles.mechanicBubbleText,
+                  ]}>{msg.text}</Text>
+                  <Text style={[
+                    styles.bubbleTime,
+                    msg.from === 'user' ? styles.userBubbleTime : styles.mechanicBubbleTime
+                  ]}>{msg.time}</Text>
+                  {/* Add navigation buttons for certain bot responses */}
+                  {showBreakdown && (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { padding: 0, backgroundColor: 'transparent', marginTop: 8 }]}
+                      onPress={() => navigation.navigate('Breakdown')}
+                    >
+                      <LinearGradient colors={["#f7cac9", "#f3e7e9", "#a1c4fd"]} style={styles.gradientBtn}>
+                        <Text style={styles.actionBtnText}>Go to Breakdown Page</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+                  {showSOS && (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { padding: 0, backgroundColor: 'transparent', marginTop: 8 }]}
+                      onPress={() => navigation.navigate('SOS')}
+                    >
+                      <LinearGradient colors={["#f7cac9", "#f3e7e9", "#a1c4fd"]} style={styles.gradientBtn}>
+                        <Text style={styles.actionBtnText}>Go to SOS Page</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
       </View>
       {/* Default Questions at Bottom */}
@@ -514,6 +566,25 @@ const styles = StyleSheet.create({
     marginRight: 0,
     marginBottom: 24, // extra space for touch input
   },
+  actionBtn: {
+    marginTop: 10,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    overflow: 'hidden',
+  },
+  gradientBtn: {
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnText: {
+    color: '#333',
+    fontWeight: 'bold',
+    fontSize: 15,
+    fontFamily: 'Poppins-Bold',
+  },
 });
 
-export default Messages; 
+export default Messages;
