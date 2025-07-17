@@ -20,6 +20,9 @@ import hiddenIcon from '../images/hidden.png';
 import visibleIcon from '../images/visible.png';
 import arrowIcon from '../images/arrow.png';
 import { useNavigation } from '@react-navigation/native';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUserType } from '../context/UserTypeContext'; // import your context
 
 const UserSignUp = () => {
   const navigation = useNavigation();
@@ -29,24 +32,28 @@ const UserSignUp = () => {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [phonePassword, setPhonePassword] = useState('');
+  const [showPhonePassword, setShowPhonePassword] = useState(false);
   const [buttonAnim] = useState(new Animated.Value(1));
+  const { userType, setUserType } = useUserType();
 
-  const handleSignUp = () => {
-    Animated.sequence([
-      Animated.timing(buttonAnim, {
-        toValue: 0.95,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonAnim, {
-        toValue: 1,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // Handle sign up logic here
-      navigation.navigate('MainTabs');
-    });
+  const handleLogin = async () => {
+    try {
+      const loginData = tab === 'phone'
+        ? { phone, password: phonePassword, user_type: userType }
+        : { username: email, password, user_type: userType };
+      const response = await axios.post('http://10.0.2.2:8000/api/users/login/', loginData);
+      const token = response.data.token;
+      const returnedUserType = response.data.user_type;
+      await AsyncStorage.setItem('jwtToken', token);
+      await AsyncStorage.setItem('userType', returnedUserType);
+      alert('Login successful!');
+      // After successful login and getting user type
+      setUserType(returnedUserType); // Set user type in context
+      navigation.navigate('MainTabs', { screen: 'Home' });
+    } catch (error) {
+      alert(error.response?.data?.error || 'Login failed');
+    }
   };
 
   const handleForgotPassword = () => {
@@ -151,17 +158,37 @@ const UserSignUp = () => {
               </View>
               {/* Form */}
               {tab === 'phone' ? (
-                <View style={styles.inputRow}>
-                  <CustomText style={styles.countryCode}>+91</CustomText>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter your mobile number"
-                    placeholderTextColor="#9E9E9E"
-                    keyboardType="phone-pad"
-                    value={phone}
-                    onChangeText={setPhone}
-                    maxLength={10}
-                  />
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputRow}>
+                    <CustomText style={styles.countryCode}>+91</CustomText>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter your mobile number"
+                      placeholderTextColor="#9E9E9E"
+                      keyboardType="phone-pad"
+                      value={phone}
+                      onChangeText={setPhone}
+                      maxLength={10}
+                    />
+                  </View>
+                  <View style={styles.inputRow}>
+                    <Image source={padlockIcon} style={styles.inputImgIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter your password"
+                      placeholderTextColor="#9E9E9E"
+                      value={phonePassword}
+                      onChangeText={setPhonePassword}
+                      secureTextEntry={!showPhonePassword}
+                      autoCapitalize="none"
+                    />
+                    <TouchableOpacity onPress={() => setShowPhonePassword(v => !v)}>
+                      <Image source={showPhonePassword ? visibleIcon : hiddenIcon} style={styles.inputImgIcon} />
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPasswordBtn}>
+                    <CustomText style={styles.forgotPasswordText}>Forgot Password?</CustomText>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <View style={styles.inputContainer}>
@@ -198,7 +225,7 @@ const UserSignUp = () => {
                 </View>
               )}
               <Animated.View style={{ transform: [{ scale: buttonAnim }], width: '100%' }}>
-                <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp} activeOpacity={0.85}>
+                <TouchableOpacity style={styles.primaryButton} onPress={handleLogin} activeOpacity={0.85}>
                   <CustomText style={styles.primaryButtonText}>LOGIN</CustomText>
                 </TouchableOpacity>
               </Animated.View>

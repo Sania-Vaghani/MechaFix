@@ -10,6 +10,7 @@ import {
   Animated,
   Image,
   ScrollView,
+  Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import CustomText from '../../Components/CustomText';
@@ -22,6 +23,8 @@ import hiddenIcon from '../images/hidden.png';
 import arrowIcon from '../images/arrow.png';
 import { useNavigation } from '@react-navigation/native';
 import { useUserType } from '../context/UserTypeContext';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SignUp = () => {
   const navigation = useNavigation();
@@ -33,21 +36,40 @@ const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [buttonAnim] = useState(new Animated.Value(1));
 
-  const handleSignUp = () => {
-    Animated.sequence([
-      Animated.timing(buttonAnim, {
-        toValue: 0.95,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonAnim, {
-        toValue: 1,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      navigation.navigate('Otp');
-    });
+  const validateEmail = (email) => {
+    // Simple email regex
+    const re = /\S+@\S+\.\S+/;
+    return re.test(email);
+  };
+
+  const handleSignUp = async () => {
+    if (!validateEmail(email)) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+    // Optionally, validate phone number format here as well
+
+    try {
+      const response = await axios.post('http://10.0.2.2:8000/api/users/signup/', {
+        username: name,
+        email,
+        phone,
+        user_type: userType,
+      });
+      console.log(response)
+      // Store info in AsyncStorage for later steps
+      await AsyncStorage.setItem('signupInfo', JSON.stringify({
+        username: name,
+        email,
+        phone,
+        user_type: userType,
+      }));
+      alert('OTP sent to your email!');
+      navigation.navigate('Otp', { email }); // <-- Pass email here!
+    } catch (error) {
+      console.log(error)
+      alert(error.response?.data?.error || 'Signup failed');
+    }
   };
 
   return (

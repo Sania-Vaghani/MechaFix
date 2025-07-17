@@ -16,12 +16,16 @@ import Profile from './src/components/Profile'; // Placeholder, create if not ex
 import SOS from './src/components/SOS'; // Placeholder, create if not exists
 import Breakdown from './src/components/Breakdown'; // Placeholder, create if not exists
 import { Image } from 'react-native';
+import MechHome from "./src/components/MechHome"
 import homeIcon from './src/images/home.png';
 import chatIcon from './src/images/chat.png';
 import userIcon from './src/images/user.png';
 import sosIcon from './src/images/sos.png';
 import carIcon from './src/images/car.png';
 import CustomTabBar from './src/components/CustomTabBar';
+import { useContext } from 'react';
+import { UserTypeContext } from './src/context/UserTypeContext';
+import HomeScreenSelector from './src/components/HomeScreenSelector';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -32,14 +36,15 @@ function MainTabNavigator() {
       screenOptions={{ headerShown: false }}
       tabBar={props => <CustomTabBar {...props} />}
     >
-      <Tab.Screen name="Home" component={UserHome} />
-      <Tab.Screen name="Messages" component={Messages} options={{ tabBarStyle: { display: 'none' } }} />
+      <Tab.Screen name="Home" component={HomeScreenSelector} />
+      <Tab.Screen name="Messages" component={Messages} />
       <Tab.Screen name="SOS" component={SOS} />
       <Tab.Screen name="Breakdown" component={Breakdown} />
       <Tab.Screen name="Profile" component={Profile} />
     </Tab.Navigator>
   );
 }
+
 
 export default function App() {
   return (

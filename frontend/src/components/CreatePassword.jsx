@@ -17,6 +17,13 @@ import visibleIcon from '../images/visible.png';
 import hiddenIcon from '../images/hidden.png';
 import arrowIcon from '../images/arrow.png';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+
+const getSignupInfo = async () => {
+  const signupInfo = await AsyncStorage.getItem('signupInfo');
+  return JSON.parse(signupInfo);
+};
 
 const CreatePassword = () => {
   const [password, setPassword] = useState('');
@@ -26,22 +33,44 @@ const CreatePassword = () => {
   const [buttonAnim] = useState(new Animated.Value(1));
   const navigation = useNavigation();
 
-  const handleContinue = () => {
-    Animated.sequence([
-      Animated.timing(buttonAnim, {
-        toValue: 0.95,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonAnim, {
-        toValue: 1,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // Navigate to next step or complete sign up
-      // navigation.navigate('NextScreen');
-    });
+  // const handleContinue = () => {
+  //   Animated.sequence([
+  //     Animated.timing(buttonAnim, {
+  //       toValue: 0.95,
+  //       duration: 80,
+  //       useNativeDriver: true,
+  //     }),
+  //     Animated.timing(buttonAnim, {
+  //       toValue: 1,
+  //       duration: 80,
+  //       useNativeDriver: true,
+  //     }),
+  //   ]).start(() => {
+  //     // Navigate to next step or complete sign up
+  //     // navigation.navigate('NextScreen');
+  //   });
+  // };
+
+  const handleCreatePassword = async () => {
+    if (password !== confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+    const signupInfo = await getSignupInfo();
+    try {
+      console.log('signupInfo:', signupInfo);
+      console.log('password:', password);
+      const response = await axios.post('http://10.0.2.2:8000/api/users/create-password/', {
+        ...signupInfo, // includes username, email, phone, user_type
+        password,
+      });
+      console.log('Create password response:', response);
+      alert('Password set successfully! You can now log in.');
+      navigation.navigate('Login');
+    } catch (error) { 
+      console.log('Create password error:', error);
+      alert(error.response?.data?.error || 'Failed to set password');
+    }
   };
 
   return (
@@ -140,7 +169,7 @@ const CreatePassword = () => {
               </TouchableOpacity>
             </View>
             <Animated.View style={{ transform: [{ scale: buttonAnim }], width: '100%' }}>
-              <TouchableOpacity style={styles.primaryButton} onPress={handleContinue} activeOpacity={0.85}>
+              <TouchableOpacity style={styles.primaryButton} onPress={handleCreatePassword} activeOpacity={0.85}>
                 <CustomText style={styles.primaryButtonText}>Continue</CustomText>
               </TouchableOpacity>
             </Animated.View>

@@ -8,16 +8,32 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Text,
+  Button,
+  Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import CustomText from '../../Components/CustomText';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import arrowIcon from '../images/arrow.png'; // Adjust the path if needed
 
-const OtpScreen = () => {
+const OtpScreen = ({ route }) => {
   const navigation = useNavigation();
   const [otp, setOtp] = useState(['', '', '', '']);
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const inputs = [useRef(null), useRef(null), useRef(null), useRef(null)];
+  const { email } = route.params || {};
+
+  // If email is missing, show a message and do not render OTP input
+  if (!email) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>No email provided. Please go back and try again.</Text>
+      </View>
+    );
+  }
 
   const handleChange = (text, idx) => {
     if (/^\d?$/.test(text)) {
@@ -41,12 +57,42 @@ const OtpScreen = () => {
     setFocusedIdx(-1);
   };
 
-  const handleContinue = () => {
-    // Handle OTP submission logic here
-    navigation.navigate('CreatePassword');
+  const getInputBorderColor = idx => '#E53935';
+
+  const handleContinue = async () => {
+    try {
+      const enteredOtp = otp.join('');
+      const response = await axios.post('http://10.0.2.2:8000/api/users/verify-otp/', {
+        email,
+        otp: enteredOtp, // <-- send as string!
+      });
+      // Only navigate if verification is successful
+      navigation.navigate('CreatePassword', { email });
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.error || 'OTP verification failed');
+    }
   };
 
-  const getInputBorderColor = idx => '#E53935';
+  const handleResendOtp = async () => {
+    try {
+      const info = await AsyncStorage.getItem('signupInfo');
+      if (!info) {
+        Alert.alert('Error', 'Signup info not found. Please sign up again.');
+        return;
+      }
+      const { username, email, phone, user_type } = JSON.parse(info);
+      await axios.post('http://10.0.2.2:8000/api/users/signup/', {
+        username,
+        email,
+        phone,
+        user_type,
+      });
+      setOtp(['', '', '', '']); // Clear OTP input fields
+      Alert.alert('Success', 'A new OTP has been sent to your email!');
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to resend OTP');
+    }
+  };
 
   return (
     <LinearGradient
@@ -55,6 +101,14 @@ const OtpScreen = () => {
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
     >
+      {/* Back Arrow */}
+      <TouchableOpacity
+        style={{ position: 'absolute', top: 56, left: 20, zIndex: 20 }}
+        onPress={() => navigation.navigate('SignUp')}
+        activeOpacity={0.7}
+      >
+        <Image source={arrowIcon} style={{ width: 26, height: 26, resizeMode: 'contain' }} />
+      </TouchableOpacity>
       {/* Decorative Dots in Gradient Background */}
       <View pointerEvents="none" style={{ position: 'absolute', width: '100%', height: '100%' }}>
         <View style={{ position: 'absolute', top: 40, left: 30, width: 18, height: 18, borderRadius: 9, backgroundColor: '#E53935', opacity: 0.25 }} />
@@ -241,7 +295,7 @@ const OtpScreen = () => {
           </TouchableOpacity>
           <View style={styles.resendContainer}>
             <CustomText style={styles.resendText}>Didn't receive the code? </CustomText>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={handleResendOtp}>
               <CustomText style={styles.resendLink}>Resend</CustomText>
             </TouchableOpacity>
           </View>
