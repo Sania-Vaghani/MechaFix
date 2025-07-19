@@ -26,6 +26,7 @@ import CustomTabBar from './src/components/CustomTabBar';
 import { useContext } from 'react';
 import { UserTypeContext } from './src/context/UserTypeContext';
 import HomeScreenSelector from './src/components/HomeScreenSelector';
+import FullMapScreen from './src/components/FullMapScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -59,6 +60,7 @@ export default function App() {
           <Stack.Screen name="Otp" component={OtpScreen} />
           <Stack.Screen name="PhoneNum" component={PhoneNum} />
           <Stack.Screen name="CreatePassword" component={CreatePassword} />
+          <Stack.Screen name="FullMap" component={FullMapScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </UserTypeProvider>

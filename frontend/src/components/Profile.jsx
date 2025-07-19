@@ -92,7 +92,28 @@ const Profile = () => {
           <ProfileOption icon={engineerIcon} label="Help and FAQs" isLast />
         </View>
         {/* Log Out Button */}
-        <TouchableOpacity style={styles.logoutBtn}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => {
+          Alert.alert(
+            'Confirm Logout',
+            'Are you sure you want to log out?',
+            [
+              {
+                text: 'No',
+                style: 'cancel',
+              },
+              {
+                text: 'Yes',
+                onPress: async () => {
+                  await AsyncStorage.removeItem('jwtToken');
+                  await AsyncStorage.removeItem('userType');
+                  navigation.navigate('Login');
+                },
+                style: 'destructive',
+              },
+            ],
+            { cancelable: true }
+          );
+        }}>
           <Image source={logoutIcon} style={[styles.logoutIcon, { tintColor: '#fff', marginRight: 12 }]} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>

@@ -19,6 +19,14 @@ import boltIcon from '../images/bolt.png';
 import messageIcon from '../images/message.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from '../services/api';
+import LiveMap from './LiveMap';
+import { useNavigation } from '@react-navigation/native';
+import MapView, { Marker } from 'react-native-maps';
+import Geolocation from '@react-native-community/geolocation'; // or 'expo-location' for Expo
+import { PermissionsAndroid, Platform } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import SOSButtonOverlay from './SOSButtonOverlay';
 
 const serviceIcons = {
   breakdown: require('../images/img1.png'),
@@ -45,7 +53,6 @@ const lastAllottedMechanics = [
 const HEADER_HEIGHT = 140; // Increased to fit search bar and results
 
 const UserHome = ({
-  onCallSOS,
   onContactMechanic,
   onFastConnection,
   onLiveChat,
@@ -96,6 +103,8 @@ const UserHome = ({
   }, [dropdownOpen, filteredMechanics.length, search]);
 
   const [user, setUser] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [sosVisible, setSosVisible] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -114,6 +123,67 @@ const UserHome = ({
     };
     fetchProfile();
   }, []);
+
+  useEffect(() => {
+    const getLocation = async () => {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          return;
+        }
+      }
+      Geolocation.getCurrentPosition(
+        position => {
+          console.log('Fetched position:', position);
+          setCurrentLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        error => {
+          console.log('Location error:', error);
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+      );
+    };
+    getLocation();
+  }, []);
+
+  const navigation = useNavigation();
+
+  useFocusEffect(
+    useCallback(() => {
+      const getLocation = async () => {
+        if (Platform.OS === 'android') {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            return;
+          }
+        }
+        Geolocation.getCurrentPosition(
+          position => {
+            console.log('Fetched position:', position);
+            setCurrentLocation({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          },
+          error => {
+            console.log('Location error:', error);
+          },
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+        );
+      };
+      getLocation(); // <-- This is where location is fetched!
+      return () => {
+        setCurrentLocation(null); // Reset on blur
+      };
+    }, [])
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F6F8FF' }}>
@@ -266,9 +336,32 @@ const UserHome = ({
             <Text style={styles.gpsDesc}>Your location is being tracked for emergency assistance</Text>
             
             {/* Map Container */}
-            <View style={styles.mapContainer}>
-              <Text style={styles.mapPlaceholderText}>Map will be displayed here</Text>
-            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('FullMap')}>
+              <View style={styles.mapContainer}>
+                {currentLocation ? (
+                  <MapView
+                    key={`${currentLocation.latitude},${currentLocation.longitude}`}
+                    style={styles.map}
+                    region={{
+                      latitude: currentLocation.latitude,
+                      longitude: currentLocation.longitude,
+                      latitudeDelta: 0.01,
+                      longitudeDelta: 0.01,
+                    }}
+                    showsUserLocation={true}
+                  >
+                    <Marker
+                      coordinate={currentLocation}
+                      title="You are here"
+                    />
+                  </MapView>
+                ) : (
+                  <View style={[styles.map, { justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text>Loading map...</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -285,7 +378,7 @@ const UserHome = ({
                 <Image source={sosIcon} style={styles.actionIcon} />
                 <Text style={styles.actionTitle}>Emergency SOS</Text>
                 <Text style={styles.actionDesc}>Immediate help for critical situations</Text>
-                <TouchableOpacity style={styles.actionBtn} onPress={onCallSOS}>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => setSosVisible(true)}>
                   <Text style={styles.actionBtnText}>Call SOS</Text>
                 </TouchableOpacity>
               </View>
@@ -391,6 +484,7 @@ const UserHome = ({
           </View>
         </View>
       </ScrollView>
+      <SOSButtonOverlay visible={sosVisible} onClose={() => setSosVisible(false)} />
     </View>
   );
 };
@@ -1119,13 +1213,18 @@ const styles = StyleSheet.create({
   mapContainer: {
     backgroundColor: '#f8f9fa',
     borderRadius: 12,
-    height: 120,
+    height: 160, // Make sure this is not too small!
     marginTop: 12,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e9ecef',
     borderStyle: 'dashed',
+    overflow: 'hidden', // Ensures rounded corners for the map
+  },
+  map: {
+    width: '100%',
+    height: '100%',
   },
   mapPlaceholderText: {
     color: '#6c757d',

@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal, TextInput, Animated, Easing, Dimensions, Linking, Alert } from 'react-native';
 import arrowIcon from '../images/arrow.png';
 import sosIcon from '../images/sos.png';
 import phoneIcon from '../images/phone.png';
 import locIcon from '../images/loc.png';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import API from '../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -11,8 +13,7 @@ const initialEmergencyContacts = [
   { name: 'Police', number: '100', color: '#2563EB', type: 'static' },
   { name: 'Ambulance', number: '108', color: '#22C55E', type: 'static' },
   { name: 'Fire Department', number: '101', color: '#F97316', type: 'static' },
-  { name: 'Emergency Contact 1', number: '+91 9876543210', color: '#FF4D4F', type: 'user' },
-  { name: 'Emergency Contact 2', number: '+91 9876543211', color: '#FF4D4F', type: 'user' },
+  // User contacts will be added dynamically
 ];
 
 const SOS = ({ navigation }) => {
@@ -25,6 +26,31 @@ const SOS = ({ navigation }) => {
   const [error, setError] = useState('');
   const [showSOSMessage, setShowSOSMessage] = useState(false);
   const ringAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const fetchUserContacts = async () => {
+      const token = await AsyncStorage.getItem('jwtToken');
+      try {
+        const res = await API.get('users/me/', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const userContacts = (res.data.emergency_contacts || []).map((c, idx) => ({
+          name: c.name || `Emergency Contact ${idx + 1}`,
+          number: c.number || '',
+          color: '#FF4D4F',
+          type: 'user'
+        }));
+        setContacts([
+          ...initialEmergencyContacts,
+          ...userContacts
+        ]);
+      } catch (err) {
+        // If error, just show static contacts
+        setContacts(initialEmergencyContacts);
+      }
+    };
+    fetchUserContacts();
+  }, []);
 
   // Filter user contacts
   const userContacts = contacts.filter(c => c.type === 'user');
@@ -42,6 +68,23 @@ const SOS = ({ navigation }) => {
     }
     setError('');
     setModalVisible(true);
+  };
+
+  const saveUserContactsToBackend = async (userContacts) => {
+    const token = await AsyncStorage.getItem('jwtToken');
+    try {
+      await API.patch('users/me/', {
+        emergency_contacts: userContacts.map(c => ({
+          name: c.name,
+          number: c.number
+        }))
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // Optionally, show a success message or refetch contacts
+    } catch (err) {
+      Alert.alert('Error', 'Failed to update emergency contacts.');
+    }
   };
 
   // Add or update contact
@@ -65,30 +108,41 @@ const SOS = ({ navigation }) => {
       setError('This number is already used in another emergency contact');
       return;
     }
+    let updatedUserContacts;
     if (modalMode === 'add') {
-      setContacts(prev => [
-        ...prev,
+      updatedUserContacts = [
+        ...userContacts,
         { name: trimmedName, number: fullNumber, color: '#FF4D4F', type: 'user' }
-      ]);
+      ];
     } else if (modalMode === 'edit' && modalContactIdx !== null) {
       let count = 0;
-      setContacts(prev => prev.map(c => {
-        if (c.type === 'user') {
-          if (count === modalContactIdx) {
-            count++;
-            return { ...c, name: trimmedName, number: fullNumber };
-          }
+      updatedUserContacts = userContacts.map((c, idx) => {
+        if (count === modalContactIdx) {
           count++;
+          return { ...c, name: trimmedName, number: fullNumber };
         }
+        count++;
         return c;
-      }));
+      });
     }
+    // Update local state
+    setContacts(prev => [
+      ...initialEmergencyContacts,
+      ...updatedUserContacts
+    ]);
     setModalVisible(false);
+    // Save to backend
+    saveUserContactsToBackend(updatedUserContacts);
   };
 
   // Delete handler
   const handleDelete = (name) => {
-    setContacts(prev => prev.filter(c => c.name !== name));
+    const updatedUserContacts = userContacts.filter(c => c.name !== name);
+    setContacts(prev => [
+      ...initialEmergencyContacts,
+      ...updatedUserContacts
+    ]);
+    saveUserContactsToBackend(updatedUserContacts);
   };
 
   // SOS Button Handler

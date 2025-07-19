@@ -92,11 +92,19 @@ def login(request):
         if not check_password(password, user.get('password', '')):
             return JsonResponse({'error': 'Invalid credentials'}, status=400)
 
+        # For mechanics, always ensure 'available' field exists
+        if user_type == 'mech' and 'available' not in user:
+            db[collection_name].update_one({'_id': user['_id']}, {'$set': {'available': True}})
+            user['available'] = True
+
         # Generate JWT token
         import jwt
         payload = {'username': user.get('username'), 'user_type': user_type}
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
-        return JsonResponse({'token': token, 'user_type': user_type})
+        response = {'token': token, 'user_type': user_type}
+        if user_type == 'mech':
+            response['available'] = user.get('available', True)
+        return JsonResponse(response)
 
 @csrf_exempt
 def create_password(request):
@@ -122,12 +130,15 @@ def create_password(request):
             return JsonResponse({'error': 'User already exists'}, status=400)
 
         # Insert new user
-        db[collection].insert_one({
+        user_doc = {
             'username': username,
             'email': email,
             'phone': phone,
             'password': hashed_password
-        })
+        }
+        if user_type in ['mech', 'mechanic']:
+            user_doc['active_mech'] = True  # Mechanic is active by default
+        db[collection].insert_one(user_doc)
 
         return JsonResponse({'message': 'User created successfully!'})
 
@@ -152,24 +163,78 @@ def verify_otp(request):
     
 @csrf_exempt
 def user_me(request):
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Bearer '):
+        return JsonResponse({'error': 'Authorization header missing or invalid'}, status=401)
+    token = auth_header.split(' ')[1]
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+    except Exception as e:
+        return JsonResponse({'error': 'Invalid token'}, status=401)
+    user_type = payload.get('user_type')
+    username = payload.get('username')
+    db = connection.cursor().db_conn
+    collection = 'auth_users' if user_type == 'user' else 'auth_mech'
+    user = db[collection].find_one({'username': username})
+    if not user:
+        return JsonResponse({'error': 'User not found'}, status=404)
+
     if request.method == 'GET':
-        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-        if not auth_header.startswith('Bearer '):
-            return JsonResponse({'error': 'Authorization header missing or invalid'}, status=401)
-        token = auth_header.split(' ')[1]
-        try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-        except Exception as e:
-            return JsonResponse({'error': 'Invalid token'}, status=401)
-        user_type = payload.get('user_type')
-        username = payload.get('username')
-        db = connection.cursor().db_conn
-        collection = 'auth_users' if user_type == 'user' else 'auth_mech'
-        user = db[collection].find_one({'username': username})
-        if not user:
-            return JsonResponse({'error': 'User not found'}, status=404)
-        # Remove sensitive info
         user.pop('password', None)
         user['_id'] = str(user['_id'])
         return JsonResponse(user)
-    return JsonResponse({'error': 'GET required'}, status=405)
+
+    elif request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+            emergency_contacts = data.get('emergency_contacts')
+            # Validate: must be a list, max 2, each with name and number
+            if not isinstance(emergency_contacts, list) or len(emergency_contacts) > 2:
+                return JsonResponse({'error': 'You must provide up to 2 emergency contacts.'}, status=400)
+            for contact in emergency_contacts:
+                if not contact.get('name') or not contact.get('number'):
+                    return JsonResponse({'error': 'Each contact must have a name and number.'}, status=400)
+            # This will add or update the field in MongoDB
+            db[collection].update_one(
+                {'username': username},
+                {'$set': {'emergency_contacts': emergency_contacts}}
+            )
+            return JsonResponse({'message': 'Emergency contacts updated successfully!'})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
+    return JsonResponse({'error': 'GET or PATCH required'}, status=405)
+
+@csrf_exempt
+def update_mechanic_availability(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Bearer '):
+        return JsonResponse({'error': 'Authorization header missing or invalid'}, status=401)
+    token = auth_header.split(' ')[1]
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+    except Exception as e:
+        return JsonResponse({'error': 'Invalid token'}, status=401)
+    if payload.get('user_type') not in ['mech', 'mechanic']:
+        return JsonResponse({'error': 'Only mechanics can update availability'}, status=403)
+    username = payload.get('username')
+    db = connection.cursor().db_conn
+    mech = db['auth_mech'].find_one({'username': username})
+    if not mech:
+        return JsonResponse({'error': 'Mechanic not found'}, status=404)
+    try:
+        data = json.loads(request.body)
+        print("Updating mechanic:", username, "with data:", data)
+        update_fields = {}
+        if 'active_mech' in data:
+            if not isinstance(data['active_mech'], bool):
+                return JsonResponse({'error': 'Field \"active_mech\" must be boolean'}, status=400)
+            update_fields['active_mech'] = data['active_mech']
+        if not update_fields:
+            return JsonResponse({'error': 'No valid fields to update'}, status=400)
+        db['auth_mech'].update_one({'username': username}, {'$set': update_fields})
+        return JsonResponse({'message': 'Availability updated', 'active_mech': update_fields['active_mech']})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
