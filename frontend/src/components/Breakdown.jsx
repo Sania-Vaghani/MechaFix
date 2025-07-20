@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, ScrollView, Image } from 'react-native';
+import React, { useState,useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, ScrollView, Image, Alert } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import arrowIcon from '../images/arrow.png';
 import downArrow from '../images/down_arrow.png';
 import { launchImageLibrary } from 'react-native-image-picker';
 import photoCamera from '../images/photo-camera.png';
+import Geolocation from '@react-native-community/geolocation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+
 
 const issueTypes = [
   'Select Issue Type',
@@ -17,6 +21,23 @@ const issueTypes = [
   'Other...'
 ];
 
+const haversine = (lat1, lon1, lat2, lon2) => {
+  const toRad = (x) => (x * Math.PI) / 180;
+  const R = 6371; // Radius of Earth in km
+
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+
 const Breakdown = ({ navigation }) => {
   const [carModel, setCarModel] = useState('');
   const [year, setYear] = useState('');
@@ -25,10 +46,91 @@ const Breakdown = ({ navigation }) => {
   const [description, setDescription] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [mechanics, setMechanics] = useState([]);
 
-  const handleSend = () => {
-    // Handle form submission
+  const prevCoords = useRef(null);
+
+  useEffect(() => {
+    const watchId = Geolocation.watchPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+
+        if (prevCoords.current) {
+          const distanceMoved = haversine(
+            prevCoords.current.latitude,
+            prevCoords.current.longitude,
+            latitude,
+            longitude
+          );
+
+          if (distanceMoved >= 2) {
+            console.log(`📍 Moved ${distanceMoved.toFixed(2)} km. Refreshing mechanics...`);
+            prevCoords.current = { latitude, longitude };
+            await handleSend(); // reuse your existing API logic
+          }
+        } else {
+          prevCoords.current = { latitude, longitude };
+        }
+      },
+      (error) => {
+        console.warn("📡 Location error:", error.message);
+      },
+      {
+        enableHighAccuracy: true,
+        distanceFilter: 50, // meters
+        interval: 30000,     // ms
+        fastestInterval: 15000,
+      }
+    );
+
+    return () => {
+      Geolocation.clearWatch(watchId);
+    };
+  }, []);
+
+
+
+  const handleSend = async () => {
+    try {
+      Geolocation.getCurrentPosition(
+        async position => {
+          const { latitude, longitude } = position.coords;
+
+          const response = await axios.post('http://10.0.2.2:8000/api/recommendations/', {
+            lat: latitude,
+            lon: longitude,
+            breakdown_type: issueType || 'engine',
+          });
+
+          const mechList = response.data.mechanics;
+          await AsyncStorage.setItem('topMechanics', JSON.stringify(mechList));
+          setMechanics(mechList);
+          console.log("✅ Mechanics stored:", mechList);
+
+          // Show success message and navigate
+          Alert.alert(
+            "Success",
+            "Breakdown request sent!",
+            [
+              {
+                text: "OK",
+                onPress: () => navigation.navigate('FoundMechanic', { mechanics: mechList })
+              }
+            ]
+          );
+        },
+        error => {
+          console.error("❌ Location error:", error.message);
+          Alert.alert("Error", "Could not get location.");
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+      );
+    } catch (err) {
+      console.error("❌ Error fetching mechanics:", err.message);
+      Alert.alert("Error", "Could not send breakdown request.");
+    }
   };
+
 
   const handleAttachImage = () => {
     launchImageLibrary({ mediaType: 'photo', quality: 0.7 }, (response) => {
@@ -147,6 +249,46 @@ const Breakdown = ({ navigation }) => {
             <Text style={styles.sendBtnText}>Send Breakdown Request</Text>
           </TouchableOpacity>
         </View>
+        {/* {mechanics.length > 0 && (
+          <View style={{ marginTop: 0, paddingHorizontal: 22, width: '92%' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#22223B' }}>
+              Top Recommended Mechanics:
+            </Text>
+            {mechanics.map((mech, index) => (
+              <View
+                key={index}
+                style={{
+                  backgroundColor: '#f2f2f2',
+                  padding: 12,
+                  marginBottom: 10,
+                  borderRadius: 12,
+                  borderColor: '#ddd',
+                  borderWidth: 1,
+                }}
+              >
+                <Text style={{ fontSize: 16, fontWeight: '600', color: '#333' }}>{mech.mech_name}</Text>
+                <Text style={{ color: '#444' }}>Rating: {mech.rating}</Text>
+                <Text style={{ color: '#444' }}>
+                  Distance: {mech.road_distance_km?.toFixed(2)} km
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    marginTop: 8,
+                    backgroundColor: '#FF5E5E',
+                    padding: 10,
+                    borderRadius: 8,
+                  }}
+                  onPress={() => {
+                    // Optional: Add logic to send request to this mechanic
+                    console.log(`Send request to: ${mech.mech_name}`);
+                  }}
+                >
+                  <Text style={{ color: '#fff', textAlign: 'center' }}>Send Request</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )} */}
       </ScrollView>
     </LinearGradient>
   );
@@ -188,7 +330,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Cormorant-Bold',
     textAlign: 'center',
     flex: 1,
-    marginLeft:-20,
+    marginLeft: -20,
   },
   scrollContent: {
     flexGrow: 1,

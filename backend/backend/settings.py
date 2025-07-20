@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'users',
     'corsheaders',
     'chatbot',
+    'mech_recommend'
 ]
 
 MIDDLEWARE = [
