@@ -17,6 +17,64 @@ from django.db import connection
 def is_valid_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
+def get_otp_email_html(app_name, otp):
+    font_links = '''
+    <link href="https://fonts.googleapis.com/css?family=Cormorant:700&display=swap" rel="stylesheet" type="text/css">
+    <link href="https://fonts.googleapis.com/css?family=Poppins:400,700&display=swap" rel="stylesheet" type="text/css">
+    '''
+    # Logo row: red rounded rectangle with centered M, and MechaFix in Cormorant, both centered horizontally
+    logo_row = f'''
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto; margin-bottom: 8px;">
+  <tr>
+    <td align="center" valign="middle" style="padding-right: 14px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width: 48px; height: 48px; background-color: #D9534F; border-radius: 12px; box-shadow: 0 2px 8px #D9534F22;">
+        <tr>
+          <td align="center" valign="middle" style="height: 48px; font-size: 26px; color: #fff; font-family: 'Poppins', Arial, sans-serif; font-weight: bold;">
+            M
+          </td>
+        </tr>
+      </table>
+    </td>
+    <td align="left" valign="middle" style="font-family: 'Cormorant', serif; font-size: 2em; font-weight: 700; color: #222; letter-spacing: 1px;">
+      {app_name}
+    </td>
+  </tr>
+</table>
+'''
+
+
+    return f'''
+    <!DOCTYPE html>
+    <html>
+    <head>
+    {font_links}
+    <meta charset="UTF-8">
+    <title>{app_name} OTP</title>
+    </head>
+    <body style="margin:0; padding:0; background: linear-gradient(180deg, #f7cac9 0%, #a1c4fd 100%); min-height:100vh; font-family: 'Poppins', Arial, sans-serif;">
+      <div style="width:100%; min-height:100vh; display:flex; align-items:center; justify-content:center;">
+        <div style="max-width: 340px; margin: 32px auto; background: #fff; border-radius: 24px; box-shadow: 0 4px 24px #0001; padding: 32px 18px 32px 18px; text-align: center;">
+          {logo_row}
+          <div style="color: #888; font-size: 1.1em; margin-bottom: 18px; letter-spacing: 2px; font-family: 'Poppins', Arial, sans-serif;">CAR SERVICES MADE SMART</div>
+          <h3 style="margin-bottom: 16px; font-size: 1.2em; color: #D9534F; font-family: 'Poppins', Arial, sans-serif;">Confirm Your Signup</h3>
+          <p style="color: #333; margin-bottom: 24px; font-family: 'Poppins', Arial, sans-serif;">
+            Thank you for joining {app_name}. Please use the following OTP to complete your login process:
+          </p>
+          <div style="display: inline-block; background: #f7cac9; color: #D9534F; font-size: 2em; font-weight: bold; letter-spacing: 12px; padding: 16px 32px; border-radius: 16px; margin-bottom: 24px; font-family: 'Poppins', Arial, sans-serif;">
+            {otp}
+          </div>
+          <p style="color: #888; font-size: 0.95em; margin-top: 24px; font-family: 'Poppins', Arial, sans-serif;">
+            If you did not request this, please ignore this email.
+          </p>
+          <div style="color: #bbb; font-size: 0.85em; margin-top: 32px; font-family: 'Poppins', Arial, sans-serif;">
+            &copy; 2025 {app_name}. All rights reserved.
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+    '''
+
 @csrf_exempt
 def signup(request):
     if request.method == 'POST':
@@ -45,9 +103,10 @@ def signup(request):
         # Send OTP via Email
         try:
             subject = "Your MechaFix OTP"
-            message = f"Your MechaFix OTP is: {otp}"
+            plain_message = f"Your MechaFix OTP is: {otp}"
+            html_message = get_otp_email_html("MechaFix", otp)
             recipient_list = [email]
-            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, recipient_list)
+            send_mail(subject, plain_message, settings.DEFAULT_FROM_EMAIL, recipient_list, html_message=html_message)
         except Exception as e:
             return JsonResponse({'error': f'Failed to send OTP: {str(e)}'}, status=500)
 
