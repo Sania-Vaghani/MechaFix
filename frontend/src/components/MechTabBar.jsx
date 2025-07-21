@@ -23,13 +23,17 @@ const MechTabBar = ({ state, descriptors, navigation }) => {
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
         const iconObj = icons[index];
+        const descriptor = descriptors[route.key];
+        // Defensive: skip if descriptor or iconObj is missing
+        if (!descriptor || !iconObj) return null;
+
         return (
           <TouchableOpacity
             key={route.key}
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
-            accessibilityLabel={descriptors[route.key]?.options.tabBarAccessibilityLabel}
-            testID={descriptors[route.key]?.options.tabBarTestID}
+            accessibilityLabel={descriptor.options?.tabBarAccessibilityLabel}
+            testID={descriptor.options?.tabBarTestID}
             onPress={() => navigation.navigate(route.name)}
             style={styles.tab}
             activeOpacity={0.8}

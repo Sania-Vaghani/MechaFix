@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import SplashScreen from './src/components/SplashScreen';
@@ -9,7 +8,7 @@ import UserTypeSelection from './src/components/UserTypeSelection';
 import SignUp from './src/components/SignUp';
 import CreatePassword from './src/components/CreatePassword';
 import UserHome from './src/components/UserHome';
-import { UserTypeProvider } from './src/context/UserTypeContext';
+import { UserTypeProvider, UserTypeContext } from './src/context/UserTypeContext';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Messages from './src/components/Messages'; // Placeholder, create if not exists
 import Profile from './src/components/Profile'; // Placeholder, create if not exists
@@ -23,25 +22,45 @@ import userIcon from './src/images/user.png';
 import sosIcon from './src/images/sos.png';
 import carIcon from './src/images/car.png';
 import CustomTabBar from './src/components/CustomTabBar';
+import MechTabBar from './src/components/MechTabBar';
 import { useContext } from 'react';
-import { UserTypeContext } from './src/context/UserTypeContext';
 import HomeScreenSelector from './src/components/HomeScreenSelector';
 import FullMapScreen from './src/components/FullMapScreen';
+import MechProfile from './src/components/MechProfile';
+import Requests from './src/components/Requests';
+import Availability from './src/components/Availability';
+import Services from './src/components/Services';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabNavigator() {
+  const { userType } = useContext(UserTypeContext);
+
+  if (userType === 'user') {
+    return (
+      <Tab.Navigator
+        screenOptions={{ headerShown: false }}
+        tabBar={props => <CustomTabBar {...props} />}
+      >
+        <Tab.Screen name="Home" component={HomeScreenSelector} />
+        <Tab.Screen name="Messages" component={Messages} />
+        <Tab.Screen name="SOS" component={SOS} />
+        <Tab.Screen name="Breakdown" component={Breakdown} />
+        <Tab.Screen name="Profile" component={Profile} />
+      </Tab.Navigator>
+    );
+  }
   return (
     <Tab.Navigator
       screenOptions={{ headerShown: false }}
-      tabBar={props => <CustomTabBar {...props} />}
+      tabBar={props => <MechTabBar {...props} />}
     >
-      <Tab.Screen name="Home" component={HomeScreenSelector} />
-      <Tab.Screen name="Messages" component={Messages} />
-      <Tab.Screen name="SOS" component={SOS} />
-      <Tab.Screen name="Breakdown" component={Breakdown} />
-      <Tab.Screen name="Profile" component={Profile} />
+      <Tab.Screen name="Home" component={MechHome} />
+      <Tab.Screen name="Availability" component={Availability} />
+      <Tab.Screen name="Services" component={Services} />
+      <Tab.Screen name="Requests" component={Requests} />
+      <Tab.Screen name="Profile" component={MechProfile} />
     </Tab.Navigator>
   );
 }

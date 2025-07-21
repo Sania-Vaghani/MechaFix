@@ -8,7 +8,7 @@ import chatIcon from '../images/chat.png';
 import historyIcon from '../images/history.png';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import MechTabBar from './MechTabBar';
+
 
 export default function MechHome() {
   const [available, setAvailable] = useState(true);
@@ -139,7 +139,7 @@ export default function MechHome() {
           ))}
         </View>
       </ScrollView>
-      <MechTabBar state={navigation.getState()} navigation={navigation} />
+      
     </View>
   );
 }
