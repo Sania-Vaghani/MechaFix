@@ -1,4 +1,4 @@
-import React, { useState,useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, ScrollView, Image, Alert } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -114,7 +114,12 @@ const Breakdown = ({ navigation }) => {
             [
               {
                 text: "OK",
-                onPress: () => navigation.navigate('FoundMechanic', { mechanics: mechList })
+                onPress: () =>
+                  navigation.navigate('FoundMechanic', {
+                    lat: latitude,
+                    lon: longitude,
+                    breakdown_type: issueType || 'engine',
+                  }),
               }
             ]
           );

@@ -30,6 +30,7 @@ import MechProfile from './src/components/MechProfile';
 import Requests from './src/components/Requests';
 import Availability from './src/components/Availability';
 import Services from './src/components/Services';
+import FoundMechanic from './src/components/FoundMechanic';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -80,6 +81,7 @@ export default function App() {
           <Stack.Screen name="PhoneNum" component={PhoneNum} />
           <Stack.Screen name="CreatePassword" component={CreatePassword} />
           <Stack.Screen name="FullMap" component={FullMapScreen} />
+          <Stack.Screen name="FoundMechanic" component={FoundMechanic} />
         </Stack.Navigator>
       </NavigationContainer>
     </UserTypeProvider>

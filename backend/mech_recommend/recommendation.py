@@ -60,7 +60,7 @@ data = list(collection.find({}))
 
 # Convert to DataFrame
 df = pd.DataFrame(data)
-print(df.head())
+# print(df.head())
 
 df = df.dropna(subset=['mech_lat', 'mech_long'])
 df['comment'] = df['comment'].fillna('')
@@ -87,46 +87,86 @@ def get_road_distance(user_lat, user_long, mech_lat, mech_long):
 # ---------------------------
 # 🔍 Recommendation Function
 # ---------------------------
-def recommend_mechanics(user_lat, user_long, breakdown_type, top_k=5):
+# def recommend_mechanics(user_lat, user_long, breakdown_type, top_k=5):
+#     filtered = df[df['breakdown_type'].str.lower() == breakdown_type.lower()].copy()
+
+#     if filtered.empty:
+#         print(f"No exact match for breakdown_type '{breakdown_type}', using all data.")
+#         filtered = df.copy()
+
+#     # Haversine distance for all mechanics
+#     filtered['distance_km'] = filtered.apply(
+#         lambda row: haversine_distance(user_lat, user_long, row['mech_lat'], row['mech_long']), axis=1
+#     )
+
+#     # Normalize features
+#     filtered['norm_rating'] = (filtered['rating'] - filtered['rating'].min()) / (filtered['rating'].max() - filtered['rating'].min())
+#     filtered['norm_sentiment'] = (filtered['sentiment_score'] - filtered['sentiment_score'].min()) / (filtered['sentiment_score'].max() - filtered['sentiment_score'].min())
+#     filtered['inv_distance'] = 1 / (filtered['distance_km'] + 1)
+#     filtered['norm_inv_distance'] = (filtered['inv_distance'] - filtered['inv_distance'].min()) / (filtered['inv_distance'].max() - filtered['inv_distance'].min())
+
+#     # Score
+#     filtered['score'] = (
+#         0.5 * filtered['norm_inv_distance'] +
+#         0.3 * filtered['norm_rating'] +
+#         0.2 * filtered['norm_sentiment']
+#     )
+
+#     # Sort and deduplicate
+#     filtered = filtered.sort_values(by='score', ascending=False)
+#     top_mechanics = filtered.drop_duplicates(subset='mech_name', keep='first').head(top_k)
+
+#     # Replace distance with road distance (fallback: haversine)
+#     top_mechanics['road_distance_km'] = top_mechanics.apply(
+#         lambda row: get_road_distance(user_lat, user_long, row['mech_lat'], row['mech_long']),
+#         axis=1
+#     )
+
+#     return top_mechanics[['mech_name', 'mech_lat', 'mech_long', 'rating', 'comment',
+#                           'breakdown_type', 'distance_km', 'road_distance_km', 'score']]
+
+def recommend_mechanics(user_lat, user_long, breakdown_type):
     filtered = df[df['breakdown_type'].str.lower() == breakdown_type.lower()].copy()
 
     if filtered.empty:
         print(f"No exact match for breakdown_type '{breakdown_type}', using all data.")
         filtered = df.copy()
 
-    # Haversine distance for all mechanics
     filtered['distance_km'] = filtered.apply(
         lambda row: haversine_distance(user_lat, user_long, row['mech_lat'], row['mech_long']), axis=1
     )
 
-    # Normalize features
     filtered['norm_rating'] = (filtered['rating'] - filtered['rating'].min()) / (filtered['rating'].max() - filtered['rating'].min())
     filtered['norm_sentiment'] = (filtered['sentiment_score'] - filtered['sentiment_score'].min()) / (filtered['sentiment_score'].max() - filtered['sentiment_score'].min())
     filtered['inv_distance'] = 1 / (filtered['distance_km'] + 1)
     filtered['norm_inv_distance'] = (filtered['inv_distance'] - filtered['inv_distance'].min()) / (filtered['inv_distance'].max() - filtered['inv_distance'].min())
 
-    # Score
     filtered['score'] = (
         0.5 * filtered['norm_inv_distance'] +
         0.3 * filtered['norm_rating'] +
         0.2 * filtered['norm_sentiment']
     )
 
-    # Sort and deduplicate
     filtered = filtered.sort_values(by='score', ascending=False)
-    top_mechanics = filtered.drop_duplicates(subset='mech_name', keep='first').head(top_k)
-
-    # Replace distance with road distance (fallback: haversine)
-    top_mechanics['road_distance_km'] = top_mechanics.apply(
-        lambda row: get_road_distance(user_lat, user_long, row['mech_lat'], row['mech_long']),
-        axis=1
-    )
-
-    return top_mechanics[['mech_name', 'mech_lat', 'mech_long', 'rating', 'comment',
-                          'breakdown_type', 'distance_km', 'road_distance_km', 'score']]
+    filtered = filtered.drop_duplicates(subset='mech_name', keep='first')
+    return filtered
 
 # ---------------------------
 # 📌 Example Usage
 # ---------------------------
-def get_top_mechanics(user_lat, user_long, breakdown_type):
-    return recommend_mechanics(user_lat, user_long, breakdown_type)
+# def get_top_mechanics(user_lat, user_long, breakdown_type):
+#     return recommend_mechanics(user_lat, user_long, breakdown_type)
+
+def get_top_mechanics(user_lat, user_long, breakdown_type, offset=0, limit=5):
+    all_mechs = recommend_mechanics(user_lat, user_long, breakdown_type)
+    page = all_mechs.iloc[offset:offset+limit].copy()
+
+    page['road_distance_km'] = page.apply(
+        lambda row: get_road_distance(user_lat, user_long, row['mech_lat'], row['mech_long']),
+        axis=1
+    )
+
+    print("Total mechanics found:", len(all_mechs))
+    print("Returning mechanics from", offset, "to", offset+limit)
+    return page[['mech_name', 'mech_lat', 'mech_long', 'rating', 'comment',
+                 'breakdown_type', 'distance_km', 'road_distance_km', 'score']]
