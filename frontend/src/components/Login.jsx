@@ -57,7 +57,7 @@ const UserSignUp = () => {
   };
 
   const handleForgotPassword = () => {
-    // Handle forgot password logic here
+   navigation.navigate('ForgotPassword',{ userType });
   };
 
   return (

@@ -31,6 +31,8 @@ import Requests from './src/components/Requests';
 import Availability from './src/components/Availability';
 import Services from './src/components/Services';
 import FoundMechanic from './src/components/FoundMechanic';
+import ForgotPasswordOtpScreen from './src/components/ForgotPasswordOtpScreen';
+import ForgotPasswordScreen from './src/components/ForgotPasswordscreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -80,6 +82,8 @@ export default function App() {
           <Stack.Screen name="Otp" component={OtpScreen} />
           <Stack.Screen name="PhoneNum" component={PhoneNum} />
           <Stack.Screen name="CreatePassword" component={CreatePassword} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="ForgotPasswordOtp" component={ForgotPasswordOtpScreen} />
           <Stack.Screen name="FullMap" component={FullMapScreen} />
           <Stack.Screen name="FoundMechanic" component={FoundMechanic} />
         </Stack.Navigator>

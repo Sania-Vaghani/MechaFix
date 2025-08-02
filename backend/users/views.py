@@ -17,7 +17,7 @@ from django.db import connection
 def is_valid_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
-def get_otp_email_html(app_name, otp):
+def get_otp_email_html(app_name, otp,heading):
     font_links = '''
     <link href="https://fonts.googleapis.com/css?family=Cormorant:700&display=swap" rel="stylesheet" type="text/css">
     <link href="https://fonts.googleapis.com/css?family=Poppins:400,700&display=swap" rel="stylesheet" type="text/css">
@@ -56,7 +56,7 @@ def get_otp_email_html(app_name, otp):
         <div style="max-width: 340px; margin: 32px auto; background: #fff; border-radius: 24px; box-shadow: 0 4px 24px #0001; padding: 32px 18px 32px 18px; text-align: center;">
           {logo_row}
           <div style="color: #888; font-size: 1.1em; margin-bottom: 18px; letter-spacing: 2px; font-family: 'Poppins', Arial, sans-serif;">CAR SERVICES MADE SMART</div>
-          <h3 style="margin-bottom: 16px; font-size: 1.2em; color: #D9534F; font-family: 'Poppins', Arial, sans-serif;">Confirm Your Signup</h3>
+          <h3 style="margin-bottom: 16px; font-size: 1.2em; color: #D9534F; font-family: 'Poppins', Arial, sans-serif;">{heading}</h3>
           <p style="color: #333; margin-bottom: 24px; font-family: 'Poppins', Arial, sans-serif;">
             Thank you for joining {app_name}. Please use the following OTP to complete your login process:
           </p>
@@ -104,7 +104,7 @@ def signup(request):
         try:
             subject = "Your MechaFix OTP"
             plain_message = f"Your MechaFix OTP is: {otp}"
-            html_message = get_otp_email_html("MechaFix", otp)
+            html_message = get_otp_email_html("MechaFix", otp, "Confirm Your Signup")
             recipient_list = [email]
             send_mail(subject, plain_message, settings.DEFAULT_FROM_EMAIL, recipient_list, html_message=html_message)
         except Exception as e:
@@ -297,3 +297,92 @@ def update_mechanic_availability(request):
         return JsonResponse({'message': 'Availability updated', 'active_mech': update_fields['active_mech']})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+
+@csrf_exempt
+def forgot_password(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        email = data.get('email')
+        user_type = data.get('user_type')
+
+        if not email or not user_type:
+            return JsonResponse({'error': 'Email and user type required'}, status=400)
+
+        if not is_valid_email(email):
+            return JsonResponse({'error': 'Invalid email format'}, status=400)
+
+        # Check if user exists
+        db = connection.cursor().db_conn
+        collection_name = 'auth_users' if user_type == 'user' else 'auth_mech'
+        user = db[collection_name].find_one({'email': email})
+
+        if not user:
+            return JsonResponse({'error': 'No account found with this email'}, status=400)
+
+        # Generate OTP
+        otp = str(random.randint(1000, 9999))
+
+        # Send OTP via Email
+        try:
+            subject = "Reset Your MechaFix Password"
+            plain_message = f"Your MechaFix password reset OTP is: {otp}"
+            html_message = get_otp_email_html("MechaFix", otp, "Reset Your Password")
+            recipient_list = [email]
+            print(f"Attempting to send email to: {email}")
+            print(f"From email: {settings.DEFAULT_FROM_EMAIL}")
+            print(f"Email host user: {settings.EMAIL_HOST_USER}")
+            send_mail(subject, plain_message, settings.DEFAULT_FROM_EMAIL, recipient_list, html_message=html_message)
+            print("Email sent successfully!")
+        except Exception as e:
+            print(f"Email error: {str(e)}")
+            return JsonResponse({'error': f'Failed to send OTP: {str(e)}'}, status=500)
+
+        # Store OTP in cache with a different key for password reset
+        cache.set(f"reset_otp_{email}", otp, timeout=300)  # 5 minutes
+
+        return JsonResponse({'message': 'Password reset OTP sent to your email!'}, status=200)
+
+@csrf_exempt
+def reset_password(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        email = data.get('email')
+        otp = data.get('otp')
+        new_password = data.get('new_password')
+        user_type = data.get('user_type')
+
+        if not all([email, otp, new_password, user_type]):
+            return JsonResponse({'error': 'All fields required'}, status=400)
+
+        # Verify OTP
+        cached_otp = cache.get(f"reset_otp_{email}")
+        if not cached_otp:
+            return JsonResponse({'error': 'OTP expired or not found. Please request a new one.'}, status=400)
+        if otp != cached_otp:
+            return JsonResponse({'error': 'Invalid OTP. Try again.'}, status=400)
+
+        # Update password
+        db = connection.cursor().db_conn
+        collection_name = 'auth_users' if user_type == 'user' else 'auth_mech'
+        user = db[collection_name].find_one({'email': email})
+
+        if not user:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        # Check if new password is same as old password
+        if check_password(new_password, user.get('password', '')):
+            return JsonResponse({'error': 'You cannot reuse your old password.'}, status=400)
+
+        hashed_password = make_password(new_password)
+        result = db[collection_name].update_one(
+            {'email': email},
+            {'$set': {'password': hashed_password}}
+        )
+
+        if result.modified_count == 0:
+            return JsonResponse({'error': 'Failed to update password'}, status=500)
+
+        # Delete OTP from cache
+        cache.delete(f"reset_otp_{email}")
+
+        return JsonResponse({'message': 'Password reset successfully!'}, status=200)
