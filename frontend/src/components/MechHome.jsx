@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Switch } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import user2Icon from '../images/user2.png';
@@ -6,19 +6,42 @@ import settingIcon from '../images/setting.png';
 import bellIcon from '../images/customer-service.png';
 import chatIcon from '../images/chat.png';
 import historyIcon from '../images/history.png';
+import addIcon from '../images/add.png';
+import customerIcon from '../images/customer.png';
+import hiIcon from '../images/hi.png';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import API from '../services/api';
 
 
 export default function MechHome() {
   const [available, setAvailable] = useState(true);
+  const [user, setUser] = useState(null);
   const navigation = useNavigation();
 
   // Placeholder data
   const recentRequests = [
-    { id: 1, name: 'John Doe', issue: 'Battery Issue', distance: '2.3 km', action: 'Accept' },
+    { id: 1, name: 'John Doe', issue: 'Battery Issue', distance: '2.3 km', action: 'View' },
     { id: 2, name: 'Alice Smith', issue: 'Engine Problem', distance: '1.8 km', action: 'View' },
   ];
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = await AsyncStorage.getItem('jwtToken');
+      const userType = await AsyncStorage.getItem('userType');
+      if (token && userType === 'mechanic') {
+        try {
+          const res = await API.get('users/me/', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setUser(res.data);
+        } catch (err) {
+          console.log('Failed to fetch mechanic profile', err);
+        }
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const handleToggle = async (value) => {
     setAvailable(value);
@@ -58,13 +81,21 @@ export default function MechHome() {
       >
         <View style={styles.headerRow}>
           <Image source={user2Icon} style={styles.avatar} />
-          <Text style={styles.headerTitle}>MechaFix Pro</Text>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.headerTitle}>
+              {user ? `Hello, ${user.username}` : 'Hello!'}
+              </Text>
+              <Image source={hiIcon} style={{ width: 38, height: 38, marginLeft: 6, marginTop: 2 }} />
+            </View>
+            <Text style={styles.headerSubtitle}>Welcome back!</Text>
+          </View>
           <TouchableOpacity style={styles.headerIconBtn}>
             <Image source={settingIcon} style={styles.headerImgIcon} />
           </TouchableOpacity>
         </View>
       </LinearGradient>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32, paddingTop: 120 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120, paddingTop: 120 }} showsVerticalScrollIndicator={false}>
         {/* Availability Status */}
         <View style={styles.statusCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -84,42 +115,49 @@ export default function MechHome() {
         </View>
         {/* Add Mechanic & Customer History */}
         <View style={styles.rowWrap}>
-          <View style={[styles.infoCard, { backgroundColor: '#e0edff' }]}> 
-            <Text style={styles.infoTitle}>Add Mechanic</Text>
-            <Text style={styles.infoDesc}>Add team members</Text>
-            <TouchableOpacity style={styles.infoBtn}>
-              <Text style={styles.infoBtnText}>Add Now</Text>
+          <View style={[styles.infoCard, { backgroundColor: '#2563EB' }]}> 
+            <View style={styles.infoIconContainer}>
+              <Image source={addIcon} style={styles.infoIcon} />
+            </View>
+            <Text style={[styles.infoTitle, { color: '#fff' }]}>Add Mechanic</Text>
+            <Text style={[styles.infoDesc, { color: '#fff' }]}>Add team members</Text>
+            <TouchableOpacity style={[styles.infoBtn, { backgroundColor: '#fff' }]}>
+              <Text style={[styles.infoBtnText, { color: '#2563EB' }]}>Add Now</Text>
             </TouchableOpacity>
           </View>
-          <View style={[styles.infoCard, { backgroundColor: '#d1fae5' }]}> 
-            <Text style={styles.infoTitle}>Customer History</Text>
-            <Text style={styles.infoDesc}>View past services</Text>
-            <TouchableOpacity style={[styles.infoBtn, { backgroundColor: '#fff', borderColor: '#22C55E', borderWidth: 1 }]}> 
+          <View style={[styles.infoCard, { backgroundColor: '#22C55E' }]}> 
+            <View style={styles.infoIconContainer}>
+              <Image source={customerIcon} style={styles.infoIcon} />
+            </View>
+            <Text style={[styles.infoTitle, { color: '#fff' }]}>Customer History</Text>
+            <Text style={[styles.infoDesc, { color: '#fff' }]}>View past services</Text>
+            <TouchableOpacity style={[styles.infoBtn, { backgroundColor: '#fff' }]}> 
               <Text style={[styles.infoBtnText, { color: '#22C55E' }]}>View History</Text>
             </TouchableOpacity>
-          </View>
-        </View>
-        {/* Active Services */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Active Services</Text>
-          <View style={styles.rowWrap}>
-            <View style={[styles.serviceCard, { backgroundColor: '#fff7ed', borderColor: '#fdba74' }]}> 
-              <Text style={styles.serviceTitle}>Ping Requests</Text>
-              <Text style={styles.serviceDesc}>3 new requests</Text>
-            </View>
-            <View style={[styles.serviceCard, { backgroundColor: '#f0f7ff', borderColor: '#a1c4fd' }]}> 
-              <Text style={styles.serviceTitle}>Live Chat & Call</Text>
-              <Text style={styles.serviceDesc}>2 active chats</Text>
-            </View>
           </View>
         </View>
         {/* Today's Overview */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Today's Overview</Text>
           <View style={styles.overviewRow}>
-            <View style={styles.overviewItem}><Text style={styles.overviewNum}>5</Text><Text style={styles.overviewLabel}>Requests</Text></View>
-            <View style={styles.overviewItem}><Text style={styles.overviewNum}>3</Text><Text style={styles.overviewLabel}>Completed</Text></View>
-            <View style={styles.overviewItem}><Text style={[styles.overviewNum, { color: '#f59e42' }]}>₹2.5k</Text><Text style={styles.overviewLabel}>Earnings</Text></View>
+            <View style={styles.overviewItem}>
+              <View style={[styles.overviewCircle, { backgroundColor: '#FF4D4F' }]}>
+                <Text style={styles.overviewNum}>5</Text>
+              </View>
+              <Text style={styles.overviewLabel}>Requests</Text>
+            </View>
+            <View style={styles.overviewItem}>
+              <View style={[styles.overviewCircle, { backgroundColor: '#F59E0B' }]}>
+                <Text style={styles.overviewNum}>2</Text>
+              </View>
+              <Text style={styles.overviewLabel}>Pending</Text>
+            </View>
+            <View style={styles.overviewItem}>
+              <View style={[styles.overviewCircle, { backgroundColor: '#22C55E' }]}>
+                <Text style={styles.overviewNum}>3</Text>
+              </View>
+              <Text style={styles.overviewLabel}>Completed</Text>
+            </View>
           </View>
         </View>
         {/* Recent Requests */}
@@ -132,12 +170,13 @@ export default function MechHome() {
                 <Text style={styles.requestName}>{req.name}</Text>
                 <Text style={styles.requestIssue}>{req.issue} • {req.distance} away</Text>
               </View>
-              <TouchableOpacity style={[styles.requestBtn, req.action === 'Accept' ? { backgroundColor: '#22C55E' } : { backgroundColor: '#3B82F6' }]}>
+              <TouchableOpacity style={[styles.requestBtn, { backgroundColor: '#3B82F6' }]}>
                 <Text style={styles.requestBtnText}>{req.action}</Text>
               </TouchableOpacity>
             </View>
           ))}
         </View>
+
       </ScrollView>
       
     </View>
@@ -160,7 +199,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 0,
+    marginBottom:30,
   },
   avatar: {
     width: 43,
@@ -172,12 +211,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 24,
     color: '#22223B',
-    flex: 1,
     fontFamily: 'Cormorant-Bold',
+    marginBottom: 2,
   },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+  },
+
   headerIconBtn: {
     marginLeft: 8,
     padding: 7,
@@ -265,6 +309,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Poppins-Bold',
   },
+  infoIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  infoIcon: {
+    width: 32,
+    height: 32,
+    tintColor: '#fff',
+  },
   sectionCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -317,13 +371,22 @@ const styles = StyleSheet.create({
   overviewNum: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#2563EB',
+    color: '#fff',
     fontFamily: 'Poppins-Bold',
   },
   overviewLabel: {
     fontSize: 13,
     color: '#6B7280',
     fontFamily: 'Poppins-Regular',
+  },
+  overviewCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   requestRow: {
     flexDirection: 'row',
@@ -336,8 +399,8 @@ const styles = StyleSheet.create({
   requestAvatar: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: '#a1c4fd',
+    borderRadius: 29,
+    backgroundColor: '#C189FF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,

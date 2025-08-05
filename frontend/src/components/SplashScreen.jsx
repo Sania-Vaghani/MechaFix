@@ -204,10 +204,10 @@ const styles = StyleSheet.create({
   },
   carRoof: {
     position: 'absolute',
-    top: 0,
+    top: -3,
     left: 15,
     width: 50,
-    height: 20,
+    height: 18,
     backgroundColor: '#92A5A6',
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
