@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "332286567826",
+    "project_id": "mechafix-6ac41",
+    "storage_bucket": "mechafix-6ac41.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:332286567826:android:4deb5db8dad9e8c2d50d4b",
+        "android_client_info": {
+          "package_name": "com.myproject"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOdSzMAA7s3kEzcJv_L4r4VcosfE3rTN0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

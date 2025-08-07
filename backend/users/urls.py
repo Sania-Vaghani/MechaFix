@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path('signup/', views.signup, name='signup'),
     path('login/', views.login, name='login'),
+    path('api/users/google-login/', views.google_login),
     path('create-password/', views.create_password, name='create_password'),
     path('verify-otp/', views.verify_otp, name='verify_otp'),
     path('forgot-password/', views.forgot_password, name='forgot_password'),

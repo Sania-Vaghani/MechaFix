@@ -75,6 +75,54 @@ def get_otp_email_html(app_name, otp,heading):
     </html>
     '''
 
+def geocode_address(address):
+    """
+    Geocode an address using Google Maps API.
+    """
+    import os
+    GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
+
+    if not address:
+        return None
+
+    if not GOOGLE_MAPS_API_KEY:
+        print("ERROR: Google Maps API key not set in environment.")
+        return None
+
+    try:
+        # Format address for URL
+        formatted_address = address.replace(' ', '+')
+        
+        # Construct URL
+        url = f"https://maps.googleapis.com/maps/api/geocode/json?address={formatted_address}&key={GOOGLE_MAPS_API_KEY}"
+        
+        print(f"Google Maps trying: {address}")
+        
+        # Get geo data from Google Maps API
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code != 200:
+            print(f"Google Maps API error: {response.text}")
+            return None
+        
+        # Decode JSON data returned by the API
+        api_response = response.json()
+        print(f"Google Maps response status: {api_response.get('status')}")
+        
+        if 'results' in api_response and len(api_response['results']) > 0:
+            latitude = api_response['results'][0]['geometry']['location']['lat']
+            longitude = api_response['results'][0]['geometry']['location']['lng']
+            
+            print(f"Google Maps geocoded to: {latitude}, {longitude}")
+            return {'lat': float(latitude), 'lon': float(longitude)}
+        else:
+            print(f"Google Maps returned no results. Status: {api_response.get('status')}")
+            return None
+            
+    except Exception as e:
+        print(f"Google Maps geocoding failed: {str(e)}")
+        return None
+
 @csrf_exempt
 def signup(request):
     if request.method == 'POST':
@@ -83,6 +131,8 @@ def signup(request):
         email = data.get('email')
         phone = data.get('phone')
         user_type = data.get('user_type')
+        address = data.get('address')
+        garage_name = data.get('garage_name')
 
         if not username or not email or not phone or not user_type:
             return JsonResponse({'error': 'All fields required'}, status=400)
@@ -96,6 +146,19 @@ def signup(request):
             return JsonResponse({'error': 'Email already exists'}, status=400)
         if db['auth_users'].find_one({'phone': phone}) or db['auth_mech'].find_one({'phone': phone}):
             return JsonResponse({'error': 'Phone already exists'}, status=400)
+
+        # If mechanic, validate address
+        coords = None
+        if user_type == 'mechanic':
+            if not garage_name:
+                return JsonResponse({'error': 'Garage name required for mechanics'}, status=400)
+
+            if not address:
+                return JsonResponse({'error': 'Address required for mechanics'}, status=400)
+            # Geocode address using improved function
+            coords = geocode_address(address)
+            if not coords:
+                return JsonResponse({'error': 'Could not geocode address. Please enter a valid address with city/area.'}, status=400)
 
         # Generate OTP
         otp = str(random.randint(1000, 9999))
@@ -112,6 +175,9 @@ def signup(request):
 
         # After sending OTP email
         cache.set(f"otp_{email}", otp, timeout=300)  # 5 minutes
+        # Store address and coords in cache for later user creation (after OTP)
+        if user_type == 'mechanic':
+            cache.set(f"signup_addr_{email}", {'address': address, 'coords': coords, 'garage_name': garage_name}, timeout=600)
 
         return JsonResponse({'message': 'OTP sent to your email!'}, status=200)
 
@@ -152,7 +218,7 @@ def login(request):
             return JsonResponse({'error': 'Invalid credentials'}, status=400)
 
         # For mechanics, always ensure 'available' field exists
-        if user_type == 'mech' and 'available' not in user:
+        if user_type == 'mechanic' and 'available' not in user:
             db[collection_name].update_one({'_id': user['_id']}, {'$set': {'available': True}})
             user['available'] = True
 
@@ -161,7 +227,7 @@ def login(request):
         payload = {'username': user.get('username'), 'user_type': user_type}
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
         response = {'token': token, 'user_type': user_type}
-        if user_type == 'mech':
+        if user_type == 'mechanic':
             response['available'] = user.get('available', True)
         return JsonResponse(response)
 
@@ -176,6 +242,8 @@ def create_password(request):
         phone = data.get('phone')
         user_type = data.get('user_type')
         password = data.get('password')
+        address = data.get('address')
+        garage_name = data.get('garage_name')
 
         if not all([username, email, phone, user_type, password]):
             return JsonResponse({'error': 'All fields required'}, status=400)
@@ -195,7 +263,30 @@ def create_password(request):
             'phone': phone,
             'password': hashed_password
         }
-        if user_type in ['mech', 'mechanic']:
+        if user_type == 'mechanic':
+            # Get address and coords from cache if not provided
+            addr_info = cache.get(f"signup_addr_{email}")
+            if not address and addr_info:
+                address = addr_info.get('address')
+                coords = addr_info.get('coords')
+                garage_name = addr_info.get('garage_name')
+            else:
+                coords = None
+
+            if not garage_name:
+                return JsonResponse({'error': 'Garage name required for mechanics'}, status=400)
+
+            if not address:
+                return JsonResponse({'error': 'Address required for mechanics'}, status=400)
+            if not coords:
+                # Geocode if not in cache using improved function
+                coords = geocode_address(address)
+                if not coords:
+                    return JsonResponse({'error': 'Could not geocode address. Please enter a valid address with city/area.'}, status=400)
+            
+            user_doc['address'] = address
+            user_doc['coords'] = coords
+            user_doc['garage_name'] = garage_name
             user_doc['active_mech'] = True  # Mechanic is active by default
         db[collection].insert_one(user_doc)
 
@@ -276,7 +367,7 @@ def update_mechanic_availability(request):
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
     except Exception as e:
         return JsonResponse({'error': 'Invalid token'}, status=401)
-    if payload.get('user_type') not in ['mech', 'mechanic']:
+    if payload.get('user_type') != 'mechanic':
         return JsonResponse({'error': 'Only mechanics can update availability'}, status=403)
     username = payload.get('username')
     db = connection.cursor().db_conn
@@ -386,3 +477,31 @@ def reset_password(request):
         cache.delete(f"reset_otp_{email}")
 
         return JsonResponse({'message': 'Password reset successfully!'}, status=200)
+
+@csrf_exempt
+def google_login(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        email = data.get('email')
+        user_type = data.get('user_type')
+
+        if not email or not user_type:
+            return JsonResponse({'error': 'Email and user type required'}, status=400)
+
+        db = connection.cursor().db_conn
+        collection = 'auth_users' if user_type == 'user' else 'auth_mech'
+        user = db[collection].find_one({'email': email})
+
+        if not user:
+            return JsonResponse({'error': 'Email not registered'}, status=404)
+
+        # Generate JWT token
+        payload = {'username': user.get('username'), 'user_type': user_type}
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+
+        response = {'token': token, 'user_type': user_type}
+        if user_type == 'mechanic':
+            response['available'] = user.get('available', True)
+
+        return JsonResponse(response, status=200)
+    return JsonResponse({'error': 'POST required'}, status=405)

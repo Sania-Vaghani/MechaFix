@@ -18,6 +18,8 @@ import userIcon from '../images/user.png';
 import emailIcon from '../images/email.png';
 import padlockIcon from '../images/padlock.png';
 import phoneIcon from '../images/phone.png';
+import location from '../images/loc1.png';
+import garageIcon from '../images/garage.png';
 import visibleIcon from '../images/visible.png';
 import hiddenIcon from '../images/hidden.png';
 import arrowIcon from '../images/arrow.png';
@@ -33,6 +35,8 @@ const SignUp = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [garageName, setGarageName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [buttonAnim] = useState(new Animated.Value(1));
 
@@ -50,12 +54,17 @@ const SignUp = () => {
     // Optionally, validate phone number format here as well
 
     try {
-      const response = await axios.post('http://10.0.2.2:8000/api/users/signup/', {
+      const payload = {
         username: name,
         email,
         phone,
         user_type: userType,
-      });
+      };
+      if (userType === 'mechanic') {
+        payload.address = address;
+        payload.garage_name = garageName;
+      }
+      const response = await axios.post('http://10.0.2.2:8000/api/users/signup/', payload);
       console.log(response)
       // Store info in AsyncStorage for later steps
       await AsyncStorage.setItem('signupInfo', JSON.stringify({
@@ -63,6 +72,7 @@ const SignUp = () => {
         email,
         phone,
         user_type: userType,
+        ...(userType === 'mechanic' ? { address, garage_name: garageName } : {}),
       }));
       alert('OTP sent to your email!');
       navigation.navigate('Otp', { email }); // <-- Pass email here!
@@ -118,6 +128,19 @@ const SignUp = () => {
                 {userType === 'mechanic' ? 'Join MechaFix as a Mechanic' : 'Join MechaFix as a User'}
               </CustomText>
               <View style={styles.inputContainer}>
+              {userType === 'mechanic' ? (
+                  <View style={styles.inputRow}>
+                    <Image source={garageIcon} style={styles.inputImgIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter your garage name"
+                      placeholderTextColor="#9E9E9E"
+                      value={garageName}
+                      onChangeText={setGarageName}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                ) : null}
                 <View style={styles.inputRow}>
                   <Image source={userIcon} style={styles.inputImgIcon} />
                   <TextInput
@@ -153,6 +176,19 @@ const SignUp = () => {
                     maxLength={10}
                   />
                 </View>
+                {userType === 'mechanic' ? (
+                  <View style={styles.inputRow}>
+                    <Image source={location} style={styles.inputImgIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter your address"
+                      placeholderTextColor="#9E9E9E"
+                      value={address}
+                      onChangeText={setAddress}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                ) : null}
               </View>
               <Animated.View style={{ transform: [{ scale: buttonAnim }], width: '100%' }}>
                 <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp} activeOpacity={0.85}>

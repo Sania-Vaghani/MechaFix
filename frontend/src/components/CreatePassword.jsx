@@ -64,10 +64,11 @@ const CreatePassword = () => {
         ...signupInfo, // includes username, email, phone, user_type
         password,
       });
+      console.log('signupInfo:', signupInfo);
       console.log('Create password response:', response);
       alert('Password set successfully! You can now log in.');
       navigation.navigate('Login');
-    } catch (error) { 
+    } catch (error) {
       console.log('Create password error:', error);
       alert(error.response?.data?.error || 'Failed to set password');
     }
@@ -118,7 +119,7 @@ const CreatePassword = () => {
       >
         <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
         {/* MechaFix Logo at the very top */}
-        <View style={[styles.logoTopContainer, { flexDirection: 'row', justifyContent: 'center' }]}> 
+        <View style={[styles.logoTopContainer, { flexDirection: 'row', justifyContent: 'center' }]}>
           <View style={styles.logoTopBox}>
             <CustomText style={styles.logoTopText}>M</CustomText>
           </View>
@@ -197,7 +198,7 @@ const CreatePassword = () => {
                     <View style={styles.cpCardWindow} />
                   </View>
                 </View>
-                <View style={[styles.cpCardBuildingBlock, { height: 40, backgroundColor: '#e0e0e0', marginLeft: 8 }]}> 
+                <View style={[styles.cpCardBuildingBlock, { height: 40, backgroundColor: '#e0e0e0', marginLeft: 8 }]}>
                   <View style={{ flex: 1, justifyContent: 'center' }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 2 }} />
                     <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 2 }}>
@@ -211,7 +212,7 @@ const CreatePassword = () => {
                     </View>
                   </View>
                 </View>
-                <View style={[styles.cpCardBuildingBlock, { height: 58, backgroundColor: '#e6e6e6', marginLeft: 8 }]}> 
+                <View style={[styles.cpCardBuildingBlock, { height: 58, backgroundColor: '#e6e6e6', marginLeft: 8 }]}>
                   <View style={styles.cpCardWindowRow}>
                     <View style={styles.cpCardWindow} />
                     <View style={styles.cpCardWindow} />
