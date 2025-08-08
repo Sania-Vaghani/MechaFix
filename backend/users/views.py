@@ -104,11 +104,11 @@ def geocode_address(address):
         if response.status_code != 200:
             print(f"Google Maps API error: {response.text}")
             return None
-        
+                
         # Decode JSON data returned by the API
         api_response = response.json()
         print(f"Google Maps response status: {api_response.get('status')}")
-        
+            
         if 'results' in api_response and len(api_response['results']) > 0:
             latitude = api_response['results'][0]['geometry']['location']['lat']
             longitude = api_response['results'][0]['geometry']['location']['lng']
@@ -118,10 +118,10 @@ def geocode_address(address):
         else:
             print(f"Google Maps returned no results. Status: {api_response.get('status')}")
             return None
-            
+
     except Exception as e:
         print(f"Google Maps geocoding failed: {str(e)}")
-        return None
+    return None
 
 @csrf_exempt
 def signup(request):

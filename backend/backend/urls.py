@@ -24,4 +24,5 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     path('chatbot/',include("chatbot.urls")),
     path('api/', include('mech_recommend.urls')),
+    path('api/mechanic/', include('mechanic.urls')),
 ] + static(settings.STATIC_URL, document_root=settings.BASE_DIR / "static")

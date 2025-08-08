@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'users',
     'corsheaders',
     'chatbot',
-    'mech_recommend'
+    'mech_recommend',
+    'mechanic'
 ]
 
 MIDDLEWARE = [
