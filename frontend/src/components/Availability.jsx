@@ -1,7 +1,8 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, TextInput, Image, Modal, Platform } from 'react-native';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, TextInput, Image, Modal, Platform, Alert } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import deleteIcon from '../images/delete.png';
 import customerIcon from '../images/customer_s.png';
 import serviceIcon from '../images/service.png';
@@ -9,8 +10,8 @@ import backArrowIcon from '../images/arrow.png';
 
 export default function Availability() {
   const navigation = useNavigation();
-  const [startTime, setStartTime] = useState('09:00 AM');
-  const [endTime, setEndTime] = useState('06:00 PM');
+  const [startTime, setStartTime] = useState('07:00 AM');
+  const [endTime, setEndTime] = useState('10:00 PM');
   const [serviceRadius, setServiceRadius] = useState(10);
   const sliderRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -21,16 +22,244 @@ export default function Availability() {
   const [editingService, setEditingService] = useState(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [timePickerType, setTimePickerType] = useState('start'); // 'start' or 'end'
-  const [tempHour, setTempHour] = useState(9);
+  const [tempHour, setTempHour] = useState(7);
   const [tempMinute, setTempMinute] = useState(0);
   const [tempAmPm, setTempAmPm] = useState('AM');
+  const [isLoading, setIsLoading] = useState(false);
   
-  // Sample current services data
-  const [currentServices, setCurrentServices] = useState([
-    { id: 1, name: 'Battery Replacement', description: 'Car battery replacement service', price: '₹500' },
-    { id: 2, name: 'Engine Repair', description: 'Complete engine diagnostic and repair', price: '₹1500' },
-    { id: 3, name: 'Tire Change', description: 'Flat tire replacement service', price: '₹300' },
-  ]);
+  // Current services data from backend
+  const [currentServices, setCurrentServices] = useState([]);
+
+  // Add new state for tracking changes
+  const [workingHoursChanged, setWorkingHoursChanged] = useState(false);
+  const [serviceRadiusChanged, setServiceRadiusChanged] = useState(false);
+
+  // Load service availability data from backend on component mount
+  useEffect(() => {
+    loadServiceAvailability();
+  }, []);
+
+  // Load service availability data
+  const loadServiceAvailability = async () => {
+    try {
+      setIsLoading(true);
+      const token = await AsyncStorage.getItem('jwtToken');
+      if (!token) {
+        console.error('No JWT token found');
+        return;
+      }
+
+      const response = await fetch('http://10.0.2.2:8000/api/mechanic/service-availability/', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Loaded service availability:', data);
+        
+        // Update state with data from backend
+        if (data.working_hours) {
+          setStartTime(data.working_hours.start_time);
+          setEndTime(data.working_hours.end_time);
+        }
+        if (data.service_radius) {
+          setServiceRadius(data.service_radius);
+        }
+        if (data.services) {
+          setCurrentServices(data.services);
+        }
+      } else {
+        console.error('Failed to load service availability:', response.status);
+      }
+    } catch (error) {
+      console.error('Error loading service availability:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Save service availability to backend
+  const saveServiceAvailability = async () => {
+    try {
+      setIsLoading(true);
+      const token = await AsyncStorage.getItem('jwtToken');
+      if (!token) {
+        Alert.alert('Error', 'Authentication token not found');
+        return;
+      }
+
+      const data = {
+        working_hours: {
+          start_time: startTime,
+          end_time: endTime
+        },
+        service_radius: serviceRadius,
+        services: currentServices
+      };
+
+      console.log('Saving service availability:', data);
+
+      const response = await fetch('http://10.0.2.2:8000/api/mechanic/service-availability/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Service availability saved:', result);
+        Alert.alert('Success', 'Service availability updated successfully!');
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to save service availability:', errorData);
+        Alert.alert('Error', errorData.error || 'Failed to save service availability');
+      }
+    } catch (error) {
+      console.error('Error saving service availability:', error);
+      Alert.alert('Error', 'Network error occurred while saving');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Individual save functions for working hours and service radius only
+  const saveWorkingHours = async () => {
+    try {
+      setIsLoading(true);
+      const token = await AsyncStorage.getItem('jwtToken');
+      if (!token) {
+        Alert.alert('Error', 'Authentication token not found');
+        return;
+      }
+
+      const data = {
+        working_hours: {
+          start_time: startTime,
+          end_time: endTime
+        },
+        service_radius: serviceRadius,
+        services: currentServices
+      };
+
+      const response = await fetch('http://10.0.2.2:8000/api/mechanic/service-availability/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        setWorkingHoursChanged(false);
+        Alert.alert('Success', 'Working hours updated successfully!');
+      } else {
+        const errorData = await response.json();
+        Alert.alert('Error', errorData.error || 'Failed to update working hours');
+      }
+    } catch (error) {
+      console.error('Error saving working hours:', error);
+      Alert.alert('Error', 'Network error occurred while saving');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveServiceRadius = async () => {
+    try {
+      setIsLoading(true);
+      const token = await AsyncStorage.getItem('jwtToken');
+      if (!token) {
+        Alert.alert('Error', 'Authentication token not found');
+        return;
+      }
+
+      const data = {
+        working_hours: {
+          start_time: startTime,
+          end_time: endTime
+        },
+        service_radius: serviceRadius,
+        services: currentServices
+      };
+
+      const response = await fetch('http://10.0.2.2:8000/api/mechanic/service-availability/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        setServiceRadiusChanged(false);
+        Alert.alert('Success', 'Service radius updated successfully!');
+      } else {
+        const errorData = await response.json();
+        Alert.alert('Error', errorData.error || 'Failed to update service radius');
+      }
+    } catch (error) {
+      console.error('Error saving service radius:', error);
+      Alert.alert('Error', 'Network error occurred while saving');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Auto-save services when they are added/edited/deleted
+  const saveServicesToCollection = async (servicesToSave = null) => {
+    try {
+      const token = await AsyncStorage.getItem('jwtToken');
+      if (!token) {
+        console.error('No JWT token found');
+        return;
+      }
+
+      // Use provided services or fall back to current state
+      const services = servicesToSave || currentServices;
+
+      // Always send complete data to ensure proper updates
+      const data = {
+        working_hours: {
+          start_time: startTime,
+          end_time: endTime
+        },
+        service_radius: serviceRadius,
+        services: services
+      };
+
+      console.log('Auto-saving services to collection:', data);
+
+      const response = await fetch('http://10.0.2.2:8000/api/mechanic/service-availability/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        console.log('Services saved to collection successfully');
+        // Refresh the data to ensure UI is in sync
+        loadServiceAvailability();
+      } else {
+        console.error('Failed to save services to collection:', response.status);
+        const errorData = await response.json();
+        console.error('Error details:', errorData);
+      }
+    } catch (error) {
+      console.error('Error saving services to collection:', error);
+    }
+  };
 
   // Optimized slider handler with proper drag support
   const handleSliderPress = useCallback((event) => {
@@ -48,7 +277,7 @@ export default function Availability() {
     const clampedValue = Math.max(1, Math.min(50, newValue));
     
     if (clampedValue !== serviceRadius) {
-      setServiceRadius(clampedValue);
+      handleServiceRadiusChange(clampedValue);
     }
   }, [serviceRadius]);
 
@@ -65,19 +294,27 @@ export default function Availability() {
   // Optimized preset button handler
   const handlePresetChange = useCallback((value) => {
     if (value !== serviceRadius) {
-      setServiceRadius(value);
+      handleServiceRadiusChange(value);
     }
   }, [serviceRadius]);
 
   // Handle delete service
   const handleDeleteService = useCallback((serviceId) => {
-    setCurrentServices(prevServices => prevServices.filter(service => service.id !== serviceId));
+    setCurrentServices(prevServices => {
+      const updatedServices = prevServices.filter(service => service.id !== serviceId);
+      
+      // Auto-save to collection with updated services
+      setTimeout(() => {
+        saveServicesToCollection(updatedServices);
+      }, 100);
+      
+      return updatedServices;
+    });
   }, []);
 
   // Handle edit service
   const handleEditService = useCallback((serviceId) => {
     console.log('Edit button pressed for service ID:', serviceId);
-    // Find the service to edit
     const serviceToEdit = currentServices.find(service => service.id === serviceId);
     if (serviceToEdit) {
       console.log('Found service to edit:', serviceToEdit);
@@ -98,11 +335,18 @@ export default function Availability() {
       price: editingService.price
     };
     
-    setCurrentServices(prevServices => 
-      prevServices.map(service => 
+    setCurrentServices(prevServices => {
+      const updatedServices = prevServices.map(service => 
         service.id === editingService.id ? updatedService : service
-      )
-    );
+      );
+      
+      // Auto-save to collection with updated services
+      setTimeout(() => {
+        saveServicesToCollection(updatedServices);
+      }, 100);
+      
+      return updatedServices;
+    });
     
     setShowEditModal(false);
     setEditingService(null);
@@ -137,9 +381,9 @@ export default function Availability() {
     const newTime = `${tempHour}:${displayMinutes} ${tempAmPm}`;
     
     if (timePickerType === 'start') {
-      setStartTime(newTime);
+      handleStartTimeChange(newTime);
     } else {
-      setEndTime(newTime);
+      handleEndTimeChange(newTime);
     }
     setShowTimePicker(false);
   };
@@ -152,32 +396,46 @@ export default function Availability() {
   const handleAddOrUpdateService = useCallback(() => {
     if (!serviceName.trim() || !servicePrice.trim()) {
       console.log('Empty service name or price, not adding');
-      return; // Don't add empty services
+      return;
     }
 
     if (editingServiceId) {
       // Update existing service
       console.log('Updating existing service with ID:', editingServiceId);
-      setCurrentServices(prevServices => 
-        prevServices.map(service => 
+      setCurrentServices(prevServices => {
+        const updatedServices = prevServices.map(service => 
           service.id === editingServiceId 
             ? { ...service, name: serviceName, price: `₹${servicePrice}` }
             : service
-        )
-      );
+        );
+        
+        // Save to collection immediately after state update
+        setTimeout(() => {
+          saveServicesToCollection(updatedServices);
+        }, 100);
+        
+        return updatedServices;
+      });
       setEditingServiceId(null);
     } else {
       // Add new service
       const newService = {
         id: Date.now(),
         name: serviceName.trim(),
-        description: 'Service description', // You can add a description field if needed
+        description: 'Service description',
         price: `₹${servicePrice.trim()}`
       };
       console.log('Adding new service:', newService);
+      
       setCurrentServices(prevServices => {
         const updatedServices = [...prevServices, newService];
         console.log('Updated services list:', updatedServices);
+        
+        // Save to collection immediately after state update
+        setTimeout(() => {
+          saveServicesToCollection(updatedServices);
+        }, 100);
+        
         return updatedServices;
       });
     }
@@ -186,6 +444,26 @@ export default function Availability() {
     setServiceName('');
     setServicePrice('');
   }, [serviceName, servicePrice, editingServiceId]);
+
+  // Update change tracking when values change
+  const handleStartTimeChange = (newTime) => {
+    setStartTime(newTime);
+    setWorkingHoursChanged(true);
+  };
+
+  const handleEndTimeChange = (newTime) => {
+    setEndTime(newTime);
+    setWorkingHoursChanged(true);
+  };
+
+  const handleServiceRadiusChange = (newRadius) => {
+    setServiceRadius(newRadius);
+    setServiceRadiusChanged(true);
+  };
+
+  const handleServicesChange = () => {
+    // This function is no longer needed as services are auto-saved
+  };
 
   return (
     <View style={styles.container}>
@@ -239,7 +517,19 @@ export default function Availability() {
               </TouchableOpacity>
             </View>
           </View>
-          <Text style={styles.currentHours}>Current hours: 09:00 - 18:00</Text>
+          <Text style={styles.currentHours}>Current hours: {startTime} - {endTime}</Text>
+          
+          {/* Simple Save Button for Working Hours */}
+          <TouchableOpacity 
+            style={[
+              styles.sectionSaveButton, 
+              !workingHoursChanged && styles.sectionSaveButtonDisabled
+            ]} 
+            onPress={saveWorkingHours}
+            disabled={!workingHoursChanged}
+          >
+            <Text style={styles.sectionSaveButtonText}>Save</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Service Radius Card */}
@@ -266,7 +556,6 @@ export default function Availability() {
               <Text style={styles.sliderLabel}>1 km</Text>
               <Text style={styles.sliderLabel}>50 km</Text>
             </View>
-            {/* Quick preset buttons */}
             <View style={styles.presetButtons}>
               <TouchableOpacity 
                 style={[styles.presetButton, serviceRadius === 5 && styles.presetButtonActive]}
@@ -287,7 +576,6 @@ export default function Availability() {
                 <Text style={[styles.presetButtonText, serviceRadius === 25 && styles.presetButtonTextActive]}>25 km</Text>
               </TouchableOpacity>
             </View>
-            {/* Optimized touch overlay with proper drag support */}
             <TouchableOpacity 
               style={styles.sliderTouchOverlay}
               onPress={handleSliderPress}
@@ -299,6 +587,18 @@ export default function Availability() {
           <Text style={styles.radiusDescription}>
             You will receive requests within {serviceRadius} km of your location
           </Text>
+          
+          {/* Simple Save Button for Service Radius */}
+          <TouchableOpacity 
+            style={[
+              styles.sectionSaveButton, 
+              !serviceRadiusChanged && styles.sectionSaveButtonDisabled
+            ]} 
+            onPress={saveServiceRadius}
+            disabled={!serviceRadiusChanged}
+          >
+            <Text style={styles.sectionSaveButtonText}>Save</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Add New Service Card */}
@@ -337,7 +637,10 @@ export default function Availability() {
             <Image source={customerIcon} style={styles.customerIcon} />
             <Text style={styles.cardTitle}>Current Services</Text>
           </View>
-          {currentServices.map(service => (
+          {currentServices.length === 0 ? (
+            <Text style={styles.noServicesText}>No services added yet. Add your first service above.</Text>
+          ) : (
+            currentServices.map(service => (
             <View key={service.id} style={styles.serviceItem}>
               <View style={styles.serviceInfo}>
                 <View style={styles.serviceNameRow}>
@@ -365,13 +668,9 @@ export default function Availability() {
                 </TouchableOpacity>
               </View>
             </View>
-          ))}
+            ))
+          )}
         </View>
-
-
-
-
-
 
       </ScrollView>
 
@@ -922,16 +1221,19 @@ const styles = StyleSheet.create({
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 20,
+    gap: 20,
   },
   cancelButton: {
-    flex: 1,
+    width: 120,
+    height: 48, // Uncommented and set fixed height
     backgroundColor: '#F3F4F6',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
-    marginRight: 8,
+    justifyContent: 'center',
   },
   cancelButtonText: {
     color: '#6B7280',
@@ -940,15 +1242,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Bold',
   },
   saveButton: {
-    flex: 1,
+    width: 120, // Same width as cancel button
+    height: 48, // Same height as cancel button
     backgroundColor: '#2563EB',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
-    marginLeft: 8,
+    justifyContent: 'center',
   },
   saveButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
     fontFamily: 'Poppins-Bold',
@@ -1050,5 +1353,49 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     fontFamily: 'Poppins-Bold',
+  },
+  saveButton: {
+    backgroundColor: '#22C55E',
+    borderRadius: 10,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: 'Poppins-Bold',
+  },
+  
+  // New styles for individual section save buttons
+  sectionSaveButton: {
+    backgroundColor: '#22C55E',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  sectionSaveButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  sectionSaveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: 'Poppins-Bold',
+  },
+  
+  // New style for no services message
+  noServicesText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingVertical: 20,
   },
 });

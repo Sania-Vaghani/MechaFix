@@ -149,3 +149,174 @@ def worker_detail(request, worker_id: str):
         return JsonResponse({'message': 'Worker deleted'})
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def service_availability(request):
+    username, error = _auth_mechanic(request)
+    if error:
+        return error
+
+    db = _get_db()
+    mech = db['auth_mech'].find_one({'username': username})
+    if not mech:
+        return JsonResponse({'error': 'Mechanic not found'}, status=404)
+    garage_name = mech.get('garage_name')
+    if not garage_name:
+        return JsonResponse({'error': 'Garage name missing for mechanic'}, status=400)
+
+    coll = db['service_availability']
+    # Ensure indexes (idempotent)
+    try:
+        coll.create_index('garage_name', unique=True)
+    except Exception:
+        pass
+
+    if request.method == 'GET':
+        # Get existing service availability for this mechanic
+        doc = coll.find_one({'garage_name': garage_name})
+        if not doc:
+            # Create default document for new user
+            default_doc = {
+                'garage_name': garage_name,
+                'working_hours': {
+                    'start_time': '07:00 AM',
+                    'end_time': '10:00 PM'
+                },
+                'service_radius': 10,
+                'services': [],  # Empty services array
+                'created_at': __import__('datetime').datetime.utcnow(),
+                'updated_at': __import__('datetime').datetime.utcnow()
+            }
+            
+            # Insert the default document
+            try:
+                result = coll.insert_one(default_doc)
+                default_doc['_id'] = result.inserted_id
+                print(f"Created default service availability for {garage_name}: {default_doc}")
+            except Exception as e:
+                print(f"Error creating default document: {e}")
+                # If insert fails, just return the default data without saving
+                default_doc.pop('_id', None)
+                return JsonResponse(default_doc)
+            
+            # Convert ObjectId to string for JSON serialization
+            default_doc['id'] = str(default_doc.pop('_id'))
+            return JsonResponse(default_doc)
+        
+        # Convert ObjectId to string for JSON serialization
+        doc['id'] = str(doc.pop('_id'))
+        return JsonResponse(doc)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            print(f"Received data for {garage_name}: {data}")  # Debug log
+            
+            # Get existing data or use defaults
+            existing_doc = coll.find_one({'garage_name': garage_name})
+            print(f"Existing doc: {existing_doc}")  # Debug log
+            
+            if existing_doc:
+                # Update existing record with new data, preserving unchanged fields
+                update_data = {
+                    'updated_at': __import__('datetime').datetime.utcnow()
+                }
+                
+                # Handle working_hours - use provided data or preserve existing
+                if 'working_hours' in data and data['working_hours']:
+                    working_hours = data['working_hours']
+                    if working_hours.get('start_time') and working_hours.get('end_time'):
+                        update_data['working_hours'] = working_hours
+                    else:
+                        return JsonResponse({'error': 'Start time and end time are required for working hours'}, status=400)
+                else:
+                    # Preserve existing working hours
+                    update_data['working_hours'] = existing_doc.get('working_hours', {
+                        'start_time': '07:00 AM',
+                        'end_time': '10:00 PM'
+                    })
+                
+                # Handle service_radius - use provided data or preserve existing
+                if 'service_radius' in data and data['service_radius'] is not None:
+                    service_radius = data['service_radius']
+                    if isinstance(service_radius, (int, float)) and service_radius > 0:
+                        update_data['service_radius'] = service_radius
+                    else:
+                        return JsonResponse({'error': 'Valid service radius is required'}, status=400)
+                else:
+                    # Preserve existing service radius
+                    update_data['service_radius'] = existing_doc.get('service_radius', 10)
+                
+                # Handle services - use provided data or preserve existing
+                if 'services' in data:
+                    services = data['services']
+                    print(f"Services to update: {services}")  # Debug log
+                    if isinstance(services, list):
+                        # Validate each service if services array is not empty
+                        if len(services) > 0:
+                            for service in services:
+                                if not service.get('name') or not service.get('price'):
+                                    return JsonResponse({'error': 'Service name and price are required for all services'}, status=400)
+                        update_data['services'] = services
+                        print(f"Services updated in update_data: {update_data['services']}")  # Debug log
+                    else:
+                        return JsonResponse({'error': 'Services must be an array'}, status=400)
+                else:
+                    # Preserve existing services
+                    update_data['services'] = existing_doc.get('services', [])
+                
+                print(f"Final update_data: {update_data}")  # Debug log
+                
+                # Update the document
+                result = coll.update_one(
+                    {'garage_name': garage_name},
+                    {'$set': update_data}
+                )
+                print(f"Update result: {result.modified_count} documents modified")  # Debug log
+                
+                message = 'Service availability updated successfully'
+                
+            else:
+                # Create new record with provided data and defaults (no default services)
+                working_hours = data.get('working_hours', {
+                    'start_time': '07:00 AM',
+                    'end_time': '10:00 PM'
+                })
+                service_radius = data.get('service_radius', 10)
+                services = data.get('services', [])  # Empty array by default
+                
+                # Validate required fields
+                if not working_hours.get('start_time') or not working_hours.get('end_time'):
+                    return JsonResponse({'error': 'Start time and end time are required'}, status=400)
+                
+                # Services can be empty array
+                if not isinstance(services, list):
+                    return JsonResponse({'error': 'Services must be an array'}, status=400)
+                
+                # Validate services if any are provided
+                if len(services) > 0:
+                    for service in services:
+                        if not service.get('name') or not service.get('price'):
+                            return JsonResponse({'error': 'Service name and price are required for all services'}, status=400)
+                
+                # Create new document
+                doc = {
+                    'garage_name': garage_name,
+                    'working_hours': working_hours,
+                    'service_radius': service_radius,
+                    'services': services,
+                    'created_at': __import__('datetime').datetime.utcnow(),
+                    'updated_at': __import__('datetime').datetime.utcnow()
+                }
+                coll.insert_one(doc)
+                doc['id'] = str(doc.pop('_id'))
+                message = 'Service availability created successfully'
+            
+            return JsonResponse({'message': message}, status=201)
+            
+        except Exception as e:
+            print(f"Error in service_availability: {str(e)}")  # Debug log
+            return JsonResponse({'error': str(e)}, status=400)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
