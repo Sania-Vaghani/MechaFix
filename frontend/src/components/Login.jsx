@@ -38,13 +38,13 @@ const UserSignUp = () => {
   const [buttonAnim] = useState(new Animated.Value(1));
   const { userType, setUserType } = useUserType();
 
-  useEffect(() => {
-  GoogleSignin.configure({
-    webClientId: '332286567826-sd9n3oibr12fpfe1g0v01ig8736tr896.apps.googleusercontent.com', // Get from Google Cloud Console
-    offlineAccess: true, 
-  scopes: ['profile', 'email'],
-  });
-}, []);
+//   useEffect(() => {
+//   GoogleSignin.configure({
+//     webClientId: '332286567826-sd9n3oibr12fpfe1g0v01ig8736tr896.apps.googleusercontent.com', // Get from Google Cloud Console
+//     offlineAccess: true, 
+//   scopes: ['profile', 'email'],
+//   });
+// }, []);
 
 
   const handleLogin = async () => {
@@ -54,6 +54,7 @@ const UserSignUp = () => {
         : { username: email, password, user_type: userType };
       const response = await axios.post('http://10.0.2.2:8000/api/users/login/', loginData);
       const token = response.data.token;
+    
       const returnedUserType = response.data.user_type;
       await AsyncStorage.setItem('jwtToken', token);
       await AsyncStorage.setItem('userType', returnedUserType);
@@ -66,33 +67,33 @@ const UserSignUp = () => {
     }
   };
 
-  const handleGoogleLogin = async () => {
-  try {
-        console.log('Checking Google Play Services...');
-    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-     console.log('Attempting sign in...');
-    const userInfo = await GoogleSignin.signIn();
-     console.log('Google User Info:', userInfo);
+//   const handleGoogleLogin = async () => {
+//   try {
+//         console.log('Checking Google Play Services...');
+//     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+//      console.log('Attempting sign in...');
+//     const userInfo = await GoogleSignin.signIn();
+//      console.log('Google User Info:', userInfo);
      
-    const { email } = userInfo.user;
+//     const { email } = userInfo.user;
 
-    const response = await axios.post('http://10.0.2.2:8000/api/users/google-login/', {
-      email,
-      user_type: userType,
-    });
+//     const response = await axios.post('http://10.0.2.2:8000/api/users/google-login/', {
+//       email,
+//       user_type: userType,
+//     });
 
-    const token = response.data.token;
-    const returnedUserType = response.data.user_type;
-    await AsyncStorage.setItem('jwtToken', token);
-    await AsyncStorage.setItem('userType', returnedUserType);
-    setUserType(returnedUserType);
-    alert('Google Login successful!');
-    navigation.navigate('MainTabs', { screen: 'Home' });
-  } catch (error) {
-    console.error('Google Sign-In Error:', error.code,error.message);
-    alert(error?.response?.data?.error || 'Google login failed');
-  }
-};
+//     const token = response.data.token;
+//     const returnedUserType = response.data.user_type;
+//     await AsyncStorage.setItem('jwtToken', token);
+//     await AsyncStorage.setItem('userType', returnedUserType);
+//     setUserType(returnedUserType);
+//     alert('Google Login successful!');
+//     navigation.navigate('MainTabs', { screen: 'Home' });
+//   } catch (error) {
+//     console.error('Google Sign-In Error:', error.code,error.message);
+//     alert(error?.response?.data?.error || 'Google login failed');
+//   }
+// };
 
 
   const handleForgotPassword = () => {
@@ -273,9 +274,9 @@ const UserSignUp = () => {
                 <TouchableOpacity style={styles.socialIconBtn}>
                   <Image source={require('../images/facebook.png')} style={styles.socialPngIcon} resizeMode="contain" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.socialIconBtn} onPress={handleGoogleLogin}>
+                {/* <TouchableOpacity style={styles.socialIconBtn} onPress={handleGoogleLogin}>
                   <Image source={require('../images/google.png')} style={styles.socialPngIcon} resizeMode="contain" />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
               <CustomText style={styles.termsText}>
                 By signing up, you agree to our <CustomText style={{ color: '#E53935', textDecorationLine: 'underline' }}>Terms</CustomText> & <CustomText style={{ color: '#E53935', textDecorationLine: 'underline' }}>Privacy Policy</CustomText>.

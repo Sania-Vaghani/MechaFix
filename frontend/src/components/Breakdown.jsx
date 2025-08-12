@@ -9,6 +9,9 @@ import photoCamera from '../images/photo-camera.png';
 import Geolocation from '@react-native-community/geolocation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import RadarModal from './RadarModal';
+import FoundMechanic from './FoundMechanic'; // Add this import
+import { useNavigation } from '@react-navigation/native';
 
 
 const issueTypes = [
@@ -47,6 +50,7 @@ const Breakdown = ({ navigation }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [mechanics, setMechanics] = useState([]);
+  const [showRadarModal, setShowRadarModal] = useState(false);
 
   const prevCoords = useRef(null);
 
@@ -151,6 +155,39 @@ const Breakdown = ({ navigation }) => {
     setSelectedImage(null);
   };
 
+  const handleSendBreakdownRequest = () => {
+    setShowRadarModal(true);
+  };
+
+  const handleMechanicsFound = (mechanics) => {
+    // Handle the mechanics found - you can implement your logic here
+    Alert.alert(
+      'Request Sent!',
+      `Breakdown request sent to ${mechanics.length} mechanics successfully!`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleNoMechanicsFound = () => {
+    // Show normal phone message first
+    Alert.alert(
+      "No Mechanics Found",
+      "No mechanic accepting request. Try to call or again send request.",
+      [
+        {
+          text: "OK",
+          onPress: () => {
+            // After user clicks OK, navigate to FoundMechanic with no mechanics message
+            navigation.navigate('FoundMechanic', {
+              showNoMechanicsMessage: true,
+              message: "No mechanic accepting request. Try to call or again send request."
+            });
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <LinearGradient colors={["#f7cac9", "#f3e7e9", "#a1c4fd"]} style={styles.gradient}>
       {/* Header */}
@@ -250,7 +287,7 @@ const Breakdown = ({ navigation }) => {
               </View>
             )}
           </View>
-          <TouchableOpacity style={styles.sendBtn} onPress={handleSend} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.sendBtn} onPress={handleSendBreakdownRequest} activeOpacity={0.85}>
             <Text style={styles.sendBtnText}>Send Breakdown Request</Text>
           </TouchableOpacity>
         </View>
@@ -295,6 +332,12 @@ const Breakdown = ({ navigation }) => {
           </View>
         )} */}
       </ScrollView>
+      {/* Radar Modal */}
+      <RadarModal
+        visible={showRadarModal}
+        onClose={() => setShowRadarModal(false)}
+        onNoMechanicsFound={handleNoMechanicsFound}
+      />
     </LinearGradient>
   );
 };
@@ -530,6 +573,36 @@ const styles = StyleSheet.create({
   },
   removeImageBtn: {
     marginLeft: 2,
+  },
+  messageContainer: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 20,
+    marginVertical: 16,
+    alignItems: 'center',
+  },
+  messageText: {
+    color: '#DC2626',
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  retryButton: {
+    backgroundColor: '#E53935',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    textAlign: 'center',
   },
 });
 

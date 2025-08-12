@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, TouchableOpacity, Image, Text, StyleSheet } from 'react-native';
 import homeIcon from '../images/home.png';
 import availabilityIcon from '../images/24-7.png';
@@ -10,7 +10,7 @@ const icons = [
   { name: 'Home', icon: homeIcon },
   { name: 'Availability', icon: availabilityIcon },
   { name: 'Services', icon: servicesIcon },
-  { name: 'Requests', icon: requestsIcon },
+  { name: 'Requests', icon: requestsIcon, badge: true },
   { name: 'Profile', icon: profileIcon },
 ];
 
@@ -18,6 +18,27 @@ const ACCENT = '#FF4D4F';
 const INACTIVE = '#B0B0B0';
 
 const MechTabBar = ({ state, descriptors, navigation }) => {
+  // This will be updated when requests change
+  const [requestCount, setRequestCount] = useState(6); // Initial count
+
+  // Listen for navigation events to update count
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // You can implement a way to get the current count here
+      // For now, we'll use a simple approach
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  // Function to update request count (can be called from Requests component)
+  const updateRequestCount = (count) => {
+    setRequestCount(count);
+  };
+
+  // Make this function available globally so Requests component can call it
+  global.updateTabBarRequestCount = updateRequestCount;
+
   return (
     <View style={styles.tabBarContainer}>
       {state.routes.map((route, index) => {
@@ -51,6 +72,20 @@ const MechTabBar = ({ state, descriptors, navigation }) => {
                     isFocused ? { tintColor: '#fff' } : { tintColor: INACTIVE },
                   ]}
                 />
+                {/* Request Count Badge */}
+                {iconObj.badge && requestCount > 0 && (
+                  <View style={[
+                    styles.badge,
+                    isFocused ? styles.badgeActive : styles.badgeInactive
+                  ]}>
+                    <Text style={[
+                      styles.badgeText,
+                      isFocused ? styles.badgeTextActive : styles.badgeTextInactive
+                    ]}>
+                      {requestCount > 99 ? '99+' : requestCount}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
             <Text style={[styles.label, isFocused && { color: ACCENT, fontWeight: 'bold' }]}>{iconObj.name}</Text>
@@ -146,6 +181,40 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 0,
     zIndex: 2,
+  },
+  badge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    zIndex: 10,
+  },
+  badgeActive: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: ACCENT,
+  },
+  badgeInactive: {
+    backgroundColor: ACCENT,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
+    fontFamily: 'Poppins-Bold',
+  },
+  badgeTextActive: {
+    color: ACCENT,
+  },
+  badgeTextInactive: {
+    color: '#FFFFFF',
   },
 });
 
