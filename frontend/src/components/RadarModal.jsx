@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions, StatusBar, Alert } from 'react-native';
+import axios from 'axios'; // Add this import
 
 const RADAR_SIZE = 250; // fills the modal better
 const MECHANIC_COUNT = 5;
@@ -19,27 +20,114 @@ function randomPolar(radius) {
   };
 }
 
-const RadarModal = ({ visible, onClose, onNoMechanicsFound }) => {
+const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakdownType }) => {
   const sweepAnim = useRef(new Animated.Value(0)).current;
   const radarPulse = useRef(new Animated.Value(1)).current;
   const [mechanicDots, setMechanicDots] = useState([]);
   const dotOpacities = useRef([...Array(MECHANIC_COUNT)].map(() => new Animated.Value(0))).current;
   const dotPulses = useRef([...Array(MECHANIC_COUNT)].map(() => new Animated.Value(1))).current;
-  const timerRef = useRef(null); // Add timer reference
+  const timerRef = useRef(null);
+  const [fetchedMechanics, setFetchedMechanics] = useState([]); // Add this state
+
+  // Transform coordinates if they come in the wrong format
+  const getCoordinates = () => {
+    if (userLocation) {
+      // Handle both formats: {lat, lon} and {latitude, longitude}
+      if (userLocation.lat !== undefined && userLocation.lon !== undefined) {
+        return { lat: userLocation.lat, lon: userLocation.lon };
+      } else if (userLocation.latitude !== undefined && userLocation.longitude !== undefined) {
+        return { lat: userLocation.latitude, lon: userLocation.longitude };
+      }
+    }
+    return null;
+  };
+
+  // Add function to fetch mechanics using fetch instead of axios
+  const fetchNearbyMechanics = async () => {
+    try {
+      const coords = getCoordinates();
+      if (!coords) {
+        console.log('❌ No valid coordinates available');
+        return;
+      }
+
+      console.log('🔍 Fetching nearby mechanics during radar scan...');
+      console.log('📍 Using coordinates:', coords);
+      
+      const response = await fetch('http://10.0.2.2:8000/api/recommendations/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lat: coords.lat,
+          lon: coords.lon,
+          breakdown_type: breakdownType || 'engine',
+          offset: 0,
+          limit: 5,
+        }),
+      });
+      
+      const text = await response.text();
+      console.log('Fetch response:', response.status, text);
+
+      if (!response.ok) {
+        console.error('Server error:', response.status, text);
+        return;
+      }
+
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        console.error('Failed to parse JSON:', text);
+        return;
+      }
+
+      if (result.status === 'success') {
+        const mechanics = result.mechanics;
+        setFetchedMechanics(mechanics);
+        console.log('✅ Mechanics fetched during radar scan:', mechanics);
+        console.log('📍 Total mechanics found:', mechanics.length);
+        
+        // Log each mechanic individually
+        mechanics.forEach((mech, index) => {
+          console.log(` Mechanic ${index + 1}: ${mech.mech_name} - ${mech.road_distance_km?.toFixed(2)}km away - Rating: ${mech.rating}`);
+        });
+      } else {
+        console.log('❌ Failed to fetch mechanics during radar scan:', result.message);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching mechanics during radar scan:', error.message);
+    }
+  };
 
   useEffect(() => {
     let sweepLoop, radarPulseLoop, dotPulseLoops = [];
     if (visible) {
+      console.log('🔍 Radar opened with location:', userLocation);
+      console.log('🔍 Breakdown type:', breakdownType);
+      
       setMechanicDots(Array.from({ length: MECHANIC_COUNT }, () => randomPolar(RADAR_SIZE / 2 - 16)));
+
+      // Fetch mechanics with a small delay to ensure backend is ready
+      const coords = getCoordinates();
+      if (coords) {
+        console.log('✅ Valid coordinates, fetching mechanics...');
+        // Add a small delay to ensure backend is ready
+        setTimeout(() => {
+          fetchNearbyMechanics();
+        }, 500);
+      } else {
+        console.log('❌ Invalid coordinates:', userLocation);
+      }
 
       // Start 10-second timer
       timerRef.current = setTimeout(() => {
         // First close the radar modal
         onClose();
         
-        // Then show phone message and open FoundMechanic
+        // Then call onNoMechanicsFound with the fetched mechanics
         if (onNoMechanicsFound) {
-          onNoMechanicsFound();
+          onNoMechanicsFound(fetchedMechanics);
         }
       }, 10000);
 
@@ -98,7 +186,7 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound }) => {
       dotOpacities.forEach(opacity => opacity.setValue(0));
       dotPulses.forEach(pulse => pulse.setValue(1));
     };
-  }, [visible, onClose, onNoMechanicsFound]); // Add onClose to dependency array
+  }, [visible, onClose, onNoMechanicsFound, userLocation, breakdownType]); // Add onClose to dependency array
 
   const rotate = sweepAnim.interpolate({
     inputRange: [0, 1],

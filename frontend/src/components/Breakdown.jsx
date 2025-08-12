@@ -155,8 +155,27 @@ const Breakdown = ({ navigation }) => {
     setSelectedImage(null);
   };
 
-  const handleSendBreakdownRequest = () => {
-    setShowRadarModal(true);
+  const handleSendBreakdownRequest = async () => {
+    try {
+      // Always get fresh location when opening radar
+      const position = await new Promise((resolve, reject) => {
+        Geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+        );
+      });
+
+      const { latitude, longitude } = position.coords;
+      prevCoords.current = { latitude, longitude };
+      
+      console.log('📍 Got fresh location for radar:', { latitude, longitude });
+      setShowRadarModal(true);
+      
+    } catch (error) {
+      console.error("❌ Location error:", error.message);
+      Alert.alert("Error", "Could not get location. Please enable GPS.");
+    }
   };
 
   const handleMechanicsFound = (mechanics) => {
@@ -168,20 +187,61 @@ const Breakdown = ({ navigation }) => {
     );
   };
 
-  const handleNoMechanicsFound = () => {
-    // Show normal phone message first
+  const handleNoMechanicsFound = (fetchedMechanics) => {
+    // Show alert first
     Alert.alert(
-      "No Mechanics Found",
-      "No mechanic accepting request. Try to call or again send request.",
+      "No One Accepted Request",
+      "No one accepted the request. Try sending request to nearby mechanics.",
       [
         {
           text: "OK",
           onPress: () => {
-            // After user clicks OK, navigate to FoundMechanic with no mechanics message
-            navigation.navigate('FoundMechanic', {
-              showNoMechanicsMessage: true,
-              message: "No mechanic accepting request. Try to call or again send request."
-            });
+            // After user clicks OK, navigate to FoundMechanic with fetched mechanics
+            if (fetchedMechanics && fetchedMechanics.length > 0) {
+              // Use the mechanics that were fetched during radar scan
+              navigation.navigate('FoundMechanic', {
+                lat: prevCoords.current?.latitude || 0,
+                lon: prevCoords.current?.longitude || 0,
+                breakdown_type: issueType || 'engine',
+                isFallback: true,
+                preFetchedMechanics: fetchedMechanics // Pass the mechanics
+              });
+            } else {
+              // Fallback: fetch mechanics again if none were fetched during radar
+              Geolocation.getCurrentPosition(
+                async position => {
+                  const { latitude, longitude } = position.coords;
+                  
+                  try {
+                    const response = await axios.post('http://10.0.2.2:8000/api/recommendations/', {
+                      lat: latitude,
+                      lon: longitude,
+                      breakdown_type: issueType || 'engine',
+                    });
+
+                    const mechList = response.data.mechanics;
+                    await AsyncStorage.setItem('topMechanics', JSON.stringify(mechList));
+                    setMechanics(mechList);
+                    
+                    navigation.navigate('FoundMechanic', {
+                      lat: latitude,
+                      lon: longitude,
+                      breakdown_type: issueType || 'engine',
+                      isFallback: true
+                    });
+                    
+                  } catch (err) {
+                    console.error("❌ Error fetching mechanics:", err.message);
+                    Alert.alert("Error", "Could not fetch nearby mechanics.");
+                  }
+                },
+                error => {
+                  console.error("❌ Location error:", error.message);
+                  Alert.alert("Error", "Could not get location.");
+                },
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+              );
+            }
           }
         }
       ]
@@ -337,6 +397,11 @@ const Breakdown = ({ navigation }) => {
         visible={showRadarModal}
         onClose={() => setShowRadarModal(false)}
         onNoMechanicsFound={handleNoMechanicsFound}
+        userLocation={prevCoords.current ? {
+          lat: prevCoords.current.latitude,
+          lon: prevCoords.current.longitude
+        } : { lat: 0, lon: 0 }}
+        breakdownType={issueType}
       />
     </LinearGradient>
   );

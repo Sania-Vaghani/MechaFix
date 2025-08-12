@@ -35,7 +35,7 @@ def get_mechanics(request):
             offset = int(data.get("offset", 0))
             limit = int(data.get("limit", 5))
             
-            # Check if lat/lon are provided and valid
+            # Re-enable validation
             if lat is None or lon is None:
                 return JsonResponse({
                     'status': 'error', 
@@ -54,6 +54,12 @@ def get_mechanics(request):
             print(f"Received request: lat={lat}, lon={lon}, type={breakdown_type}, offset={offset}, limit={limit}")
 
             mechanics_df = get_top_mechanics(lat, lon, breakdown_type, offset, limit)
+            
+            # Add debugging
+            if mechanics_df.empty:
+                print("No mechanics found in DataFrame")
+                return JsonResponse({'status': 'success', 'mechanics': []})
+            
             mechanics_df = mechanics_df.where(pd.notnull(mechanics_df), None)
             mechanic_list = mechanics_df.to_dict(orient='records')
 

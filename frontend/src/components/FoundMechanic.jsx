@@ -4,37 +4,31 @@ import LinearGradient from 'react-native-linear-gradient';
 import arrowIcon from '../images/arrow.png';
 
 const FoundMechanic = ({ route, navigation }) => {
-  const { lat, lon, breakdown_type } = route.params;
+  const { lat, lon, breakdown_type, isFallback, preFetchedMechanics } = route.params;
+  
+  // Add this logging
+  console.log('FoundMechanic received params:', { lat, lon, breakdown_type });
 
   const [mechanics, setMechanics] = useState([]);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [allLoaded, setAllLoaded] = useState(false);
 
-  useEffect(() => {
-    fetchMechanics();
-  }, []);
-
   const fetchMechanics = async () => {
     if (loading || allLoaded) return;
     setLoading(true);
-
-    // Add this logging to see what you're sending
-    const requestData = {
-      lat,
-      lon,
-      breakdown_type,
-      offset,
-      limit: 5,
-    };
-    
-    console.log('Sending request data:', requestData);
 
     try {
       const response = await fetch('http://10.0.2.2:8000/api/recommendations/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestData),
+        body: JSON.stringify({
+          lat,
+          lon,
+          breakdown_type,
+          offset,
+          limit: 5,
+        }),
       });
       
       const text = await response.text();
@@ -73,6 +67,19 @@ const FoundMechanic = ({ route, navigation }) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // If we have pre-fetched mechanics, use them
+    if (preFetchedMechanics && preFetchedMechanics.length > 0) {
+      console.log('✅ Using pre-fetched mechanics from radar scan:', preFetchedMechanics);
+      setMechanics(preFetchedMechanics);
+      setOffset(preFetchedMechanics.length);
+      if (preFetchedMechanics.length < 5) setAllLoaded(true);
+    } else {
+      // Otherwise fetch mechanics normally
+      fetchMechanics();
+    }
+  }, [preFetchedMechanics]);
 
   return (
     <LinearGradient colors={["#f7cac9", "#f3e7e9", "#a1c4fd"]} style={styles.gradient}>
