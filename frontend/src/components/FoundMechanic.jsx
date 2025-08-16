@@ -130,7 +130,14 @@ const styles = StyleSheet.create({
   },
   backArrow: { marginRight: 10, backgroundColor: '#fff', borderRadius: 16, padding: 4 },
   backArrowIcon: { width: 20, height: 20, resizeMode: 'contain', tintColor: '#FF4D4F' },
-  headerTitle: { fontSize: 28, color: '#fff', textAlign: 'center', flex: 1, marginLeft: -20 },
+  headerTitle: {
+    fontSize: 28,
+    color: '#fff',
+    fontFamily: 'Cormorant-Bold',
+    textAlign: 'center',
+    flex: 1,
+    marginLeft: -20,
+  },
   scrollContent: { alignItems: 'center', paddingBottom: 32, paddingTop: 18 },
   card: {
     backgroundColor: '#fff', borderRadius: 18, padding: 18, width: '90%',

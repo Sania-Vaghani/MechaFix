@@ -32,7 +32,6 @@ const Profile = () => {
           setUser(res.data);
         } catch (err) {
           console.log('Failed to fetch user profile', err);
-          Alert.alert('Error', 'Failed to fetch user profile: ' + (err?.message || 'Unknown error'));
         }
       }
     };
@@ -106,6 +105,7 @@ const Profile = () => {
                 onPress: async () => {
                   await AsyncStorage.removeItem('jwtToken');
                   await AsyncStorage.removeItem('userType');
+                  await AsyncStorage.removeItem('user');
                   navigation.navigate('Login');
                 },
                 style: 'destructive',

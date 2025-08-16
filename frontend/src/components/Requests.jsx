@@ -1,132 +1,116 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Alert } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import backArrowIcon from '../images/arrow.png';
 import userIcon from '../images/user.png';
 import phoneIcon from '../images/phone.png';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Requests() {
   const navigation = useNavigation();
   
-  // Use state to manage requests so they can be deleted
-  const [pendingRequests, setPendingRequests] = useState([
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john.doe@email.com',
-      phone: '+91 9876543210',
-      initials: 'JD',
-      status: 'pending',
-      distance: '2.5 km',
-      issue: 'Battery dead, car won\'t start'
-    },
-    {
-      id: 2,
-      name: 'Sarah Wilson',
-      email: 'sarah.wilson@email.com',
-      phone: '+91 8765432109',
-      initials: 'SW',
-      status: 'pending',
-      distance: '1.8 km',
-      issue: 'Flat tire, need roadside assistance'
-    },
-    {
-      id: 3,
-      name: 'Mike Johnson',
-      email: 'mike.johnson@email.com',
-      phone: '+91 7654321098',
-      initials: 'MJ',
-      status: 'pending',
-      distance: '3.2 km',
-      issue: 'Engine overheating, coolant leak'
-    },
-    {
-      id: 4,
-      name: 'Emily Davis',
-      email: 'emily.davis@email.com',
-      phone: '+91 6543210987',
-      initials: 'ED',
-      status: 'pending',
-      distance: '0.9 km',
-      issue: 'Key stuck in ignition'
-    },
-    {
-      id: 5,
-      name: 'Alex Thompson',
-      email: 'alex.thompson@email.com',
-      phone: '+91 5432109876',
-      initials: 'AT',
-      status: 'pending',
-      distance: '4.1 km',
-      issue: 'Brake system failure'
-    },
-    {
-      id: 6,
-      name: 'Lisa Chen',
-      email: 'lisa.chen@email.com',
-      phone: '+91 4321098765',
-      initials: 'LC',
-      status: 'pending',
-      distance: '2.7 km',
-      issue: 'Electrical system malfunction'
-    }
-  ]);
+  // Requests from backend
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [mechanicId, setMechanicId] = useState(null);
 
-  // Function to handle request rejection
+  useEffect(() => {
+    const fetchMechanic = async () => {
+      try {
+        const token = await AsyncStorage.getItem('jwtToken');
+        if (!token) {
+          console.log("No token found");
+          return;
+        }
+
+        const res = await axios.get('http://10.0.2.2:8000/api/users/me/', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        console.log("Mechanic profile:", res.data);
+
+        // Assuming backend returns _id for mechanic
+        setMechanicId(res.data._id);  
+
+      } catch (err) {
+        console.error("Error fetching mechanic profile:", err?.response?.data || err.message);
+      }
+    };
+
+    fetchMechanic();
+  }, []);
+
+  // Fetch pending requests dynamically
+  useEffect(() => {
+    const fetchRequests = async () => {
+      try {
+        const res = await axios.get('http://10.0.2.2:8000/api/pending-requests/');
+        if (res.data.status === 'success') {
+          const formatted = res.data.requests.map(req => {
+            let myDistance = "N/A";
+
+            if (mechanicId && req.mechanics_list?.length) {
+              // match by mechanic ID
+              const myEntry = req.mechanics_list.find(m => String(m.mech_id) === String(mechanicId));
+              if (myEntry) {
+                myDistance = `${Number(myEntry.road_distance_km).toFixed(2)} km`;
+              }              
+            }
+
+            return {
+              id: req._id,
+              name: req.user_name || 'Unknown User',
+              phone: req.user_phone || 'N/A',
+              issue: req.breakdown_type || 'N/A',
+              distance: myDistance,
+              initials: req.user_name?.trim()
+                ? req.user_name.split(' ').map(n => n[0]).join('').toUpperCase()
+                : 'U'
+            };
+          });
+          setPendingRequests(formatted);
+        }
+      } catch (err) {
+        console.error('Error fetching requests:', err);
+      }
+    };
+
+    fetchRequests();
+    const interval = setInterval(fetchRequests, 5000); 
+    return () => clearInterval(interval);
+  }, [mechanicId]);
+
+  // Reject request handler
   const handleRejectRequest = (requestId) => {
     Alert.alert(
       'Reject Request',
       'Are you sure you want to reject this request?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Reject',
           style: 'destructive',
           onPress: () => {
-            // Remove the rejected request from the list
-            setPendingRequests(prevRequests => {
-              const newRequests = prevRequests.filter(request => request.id !== requestId);
-              
-              // Update the tab bar count
-              if (global.updateTabBarRequestCount) {
-                global.updateTabBarRequestCount(newRequests.length);
-              }
-              
-              return newRequests;
-            });
+            setPendingRequests(prev => prev.filter(r => r.id !== requestId));
           },
         },
       ]
     );
   };
 
-  // Function to handle call button
   const handleCall = (phoneNumber) => {
-    // You can implement actual calling functionality here
     Alert.alert('Call', `Calling ${phoneNumber}`);
   };
 
-  // Function to handle detail button
   const handleDetail = (request) => {
-    // You can implement navigation to detail screen here
     Alert.alert('Request Details', `Showing details for ${request.name}`);
   };
 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={['#FF4D4F', '#FF7875']}
-        style={styles.header}
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
+      <LinearGradient colors={['#FF4D4F', '#FF7875']} style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Image source={backArrowIcon} style={styles.backIcon} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Ping Request</Text>
@@ -138,10 +122,8 @@ export default function Requests() {
         style={styles.scrollContent} 
         contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={true}
-        bounces={true}
-        alwaysBounceVertical={false}
       >
-        {/* Main Heading */}
+        {/* Heading */}
         <View style={styles.mainHeadingContainer}>
           <Image source={userIcon} style={styles.mainHeadingIcon} />
           <Text style={styles.mainHeading}>User Details</Text>
@@ -149,7 +131,7 @@ export default function Requests() {
         
         {pendingRequests.map((request, index) => (
           <View key={request.id} style={[styles.mainCard, index > 0 && styles.cardMargin]}>
-            {/* User Info Row */}
+            {/* User Row */}
             <View style={styles.userRow}>
               <View style={styles.avatarContainer}>
                 <View style={styles.avatar}>
@@ -165,31 +147,22 @@ export default function Requests() {
               </View>
             </View>
 
-            {/* Issue and Distance */}
+            {/* Issue + Distance */}
             <View style={styles.detailsRow}>
               <Text style={styles.issueText}>Issue : {request.issue}</Text>
               <Text style={styles.distanceText}>Distance : {request.distance}</Text>
             </View>
 
-            {/* Contact and Actions */}
+            {/* Actions */}
             <View style={styles.bottomRow}>
               <View style={styles.buttonGroup}>
-                <TouchableOpacity 
-                  style={styles.callButton}
-                  onPress={() => handleCall(request.phone)}
-                >
+                <TouchableOpacity style={styles.callButton} onPress={() => handleCall(request.phone)}>
                   <Text style={styles.callButtonText}>Call</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.detailButton}
-                  onPress={() => handleDetail(request)}
-                >
+                <TouchableOpacity style={styles.detailButton} onPress={() => handleDetail(request)}>
                   <Text style={styles.detailButtonText}>Detail</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.rejectButton}
-                  onPress={() => handleRejectRequest(request.id)}
-                >
+                <TouchableOpacity style={styles.rejectButton} onPress={() => handleRejectRequest(request.id)}>
                   <Text style={styles.rejectButtonText}>Reject</Text>
                 </TouchableOpacity>
               </View>
