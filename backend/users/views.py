@@ -13,6 +13,11 @@ from django.core.cache import cache
 import jwt
 from django.conf import settings
 from django.db import connection
+import os
+from twilio.rest import Client
+import urllib.parse
+from twilio.base.exceptions import TwilioRestException
+
 
 def is_valid_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
@@ -505,3 +510,71 @@ def google_login(request):
 
         return JsonResponse(response, status=200)
     return JsonResponse({'error': 'POST required'}, status=405)
+
+@csrf_exempt
+def send_sos_whatsapp(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    try:
+        data = json.loads(request.body)
+        to = data.get('to')                # E.164, e.g. +919876543210
+        username = data.get('username')    # sender username
+        lat = data.get('lat')
+        lon = data.get('lon')
+
+        to = to.replace(' ', '')
+        if not to.startswith('+'):
+            return JsonResponse(
+                {'error': 'Recipient number must be in E.164 format starting with +'},
+                status=400
+            )
+        
+        if not all([to, username, lat, lon]):
+            return JsonResponse({'error': 'to, username, lat, lon required'}, status=400)
+
+        # Build message
+        maps_link = f"https://www.google.com/maps?q={lat},{lon}"
+        body = f"Emergency SOS from {username}.\nLocation: {maps_link}"
+
+        # Twilio credentials from environment
+        account_sid = os.getenv('TWILIO_ACCOUNT_SID')
+        auth_token = os.getenv('TWILIO_AUTH_TOKEN')
+        whatsapp_from = os.getenv('TWILIO_WHATSAPP_FROM')  # e.g. 'whatsapp:+14155238886'
+
+        print(f"[DEBUG] TWILIO_WHATSAPP_FROM: {whatsapp_from}")
+        print(f"[DEBUG] TWILIO_WHATSAPP_TO: whatsapp:{to}")
+
+        client = Client(account_sid, auth_token)
+
+        # Send message
+        message = client.messages.create(
+            body=body,
+            from_=whatsapp_from,
+            to=f"whatsapp:{to}"
+        )
+
+        # Log SID and status
+        print(f"Twilio message SID: {message.sid}, Status: {message.status}")
+
+        return JsonResponse({'status': 'sent', 'sid': message.sid})
+
+    except TwilioRestException as tre:
+        # Log Twilio-specific error
+        print(f"Twilio error code: {tre.code}, message: {tre.msg}, details: {str(tre)}")
+        click = f"https://wa.me/{to.replace('+','')}?text={urllib.parse.quote(body)}"
+        return JsonResponse({
+            'status': 'fallback',
+            'click_to_chat': click,
+            'error_code': tre.code,
+            'error_message': tre.msg
+        })
+
+    except Exception as e:
+        # Log generic error
+        print(f"General error sending WhatsApp: {str(e)}")
+        click = f"https://wa.me/{to.replace('+','')}?text={urllib.parse.quote(body)}"
+        return JsonResponse({
+            'status': 'fallback',
+            'click_to_chat': click,
+            'error': str(e)
+        })

@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, StatusBar, Animated, Easing, Dimensions, Platform } from 'react-native';
 import CustomText from '../../Components/CustomText';
 import LinearGradient from 'react-native-linear-gradient';
+import { useUserType } from '../context/UserTypeContext';
 
 const { height, width } = Dimensions.get('window');
 
@@ -12,6 +13,7 @@ const SplashScreen = ({ navigation }) => {
   const titleFade = useRef(new Animated.Value(0)).current;
   const taglineFade = useRef(new Animated.Value(0)).current;
   const infoFade = useRef(new Animated.Value(0)).current;
+  const { userType, isLoading } = useUserType();
 
   useEffect(() => {
     const fadeIn = Animated.timing(fadeAnim, {
@@ -40,12 +42,19 @@ const SplashScreen = ({ navigation }) => {
       )
     ]).start();
 
-    // Navigate to UserTypeSelection after 3 seconds
     const timer = setTimeout(() => {
-      navigation.replace('UserTypeSelection');
-    }, 3000);
+      if (!isLoading) {
+        if (userType) {
+          // User is logged in, go to main app
+          navigation.replace('MainTabs');
+        } else {
+          // No user logged in, go to user type selection
+          navigation.replace('UserTypeSelection');
+        }
+      }
+    }, 2000); // 2 second splash
     return () => clearTimeout(timer);
-  }, [fadeAnim, carAnim, logoFade, titleFade, taglineFade, infoFade, navigation]);
+  }, [fadeAnim, carAnim, logoFade, titleFade, taglineFade, infoFade, navigation, userType, isLoading]);
 
   const carTranslateX = carAnim.interpolate({
     inputRange: [0, 1],

@@ -13,30 +13,79 @@ import chatIcon from '../images/chat.png';
 import logoutIcon from '../images/logout.png';
 import arrowIcon from '../images/arrow.png';
 import { useNavigation } from '@react-navigation/native';
+import { useUserType } from '../context/UserTypeContext';
+import { useLogout } from '../hooks/useLogout';
 
 const Profile = () => {
   const navigation = useNavigation();
   const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { userType } = useUserType();
+  const { handleLogout } = useLogout();
+
+  console.log('🔄 [Profile] Component rendered - userType:', userType);
 
   useEffect(() => {
+    console.log('🔄 [Profile] useEffect triggered');
+    
     const fetchProfile = async () => {
-      const token = await AsyncStorage.getItem('jwtToken');
-      const userType = await AsyncStorage.getItem('userType');
-      console.log('Token:', token, 'UserType:', userType);
-      if (token && userType === 'user') {
-        try {
+      console.log('🔄 [Profile] fetchProfile started');
+      
+      try {
+        const token = await AsyncStorage.getItem('jwtToken');
+        const storedUserType = await AsyncStorage.getItem('userType');
+        
+        console.log('📱 [Profile] AsyncStorage values:', {
+          token: token ? 'EXISTS' : 'NULL',
+          storedUserType,
+          contextUserType: userType
+        });
+        
+        // Only fetch profile if userType is 'user'
+        if (token && storedUserType === 'user') {
+          console.log('✅ [Profile] Fetching user profile...');
+          
           const res = await API.get('users/me/', {
             headers: { Authorization: `Bearer ${token}` }
           });
-          console.log('User data:', res.data);
+          
+          console.log('✅ [Profile] User data fetched:', res.data);
           setUser(res.data);
-        } catch (err) {
-          console.log('Failed to fetch user profile', err);
+        } else {
+          console.log('⚠️ [Profile] Not a user or no token, skipping profile fetch');
         }
+      } catch (err) {
+        console.error('❌ [Profile] Failed to fetch user profile:', err);
+      } finally {
+        setIsLoading(false);
+        console.log('🏁 [Profile] fetchProfile completed');
       }
     };
+
     fetchProfile();
-  }, []);
+  }, [userType]);
+
+  // Show loading state
+  if (isLoading) {
+    console.log('⏳ [Profile] Showing loading state');
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text>Loading profile...</Text>
+      </View>
+    );
+  }
+
+  // Don't render if not a user
+  if (userType !== 'user') {
+    console.log('⚠️ [Profile] Not a user account, showing message');
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text>Not a user account</Text>
+      </View>
+    );
+  }
+
+  console.log('✅ [Profile] Rendering user profile UI');
 
   return (
     <View style={styles.container}>
@@ -91,29 +140,7 @@ const Profile = () => {
           <ProfileOption icon={engineerIcon} label="Help and FAQs" isLast />
         </View>
         {/* Log Out Button */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={() => {
-          Alert.alert(
-            'Confirm Logout',
-            'Are you sure you want to log out?',
-            [
-              {
-                text: 'No',
-                style: 'cancel',
-              },
-              {
-                text: 'Yes',
-                onPress: async () => {
-                  await AsyncStorage.removeItem('jwtToken');
-                  await AsyncStorage.removeItem('userType');
-                  await AsyncStorage.removeItem('user');
-                  navigation.navigate('Login');
-                },
-                style: 'destructive',
-              },
-            ],
-            { cancelable: true }
-          );
-        }}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => handleLogout(true)}>
           <Image source={logoutIcon} style={[styles.logoutIcon, { tintColor: '#fff', marginRight: 12 }]} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>

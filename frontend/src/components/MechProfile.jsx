@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Linking } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from '../services/api';
@@ -11,46 +11,61 @@ import historyIcon from '../images/history.png';
 import customerServiceIcon from '../images/customer-service.png';
 import engineerIcon from '../images/engineer.png';
 import logoutIcon from '../images/logout.png';
+import user2Icon from '../images/user2.png';
+import emergencyIcon from '../images/emergency-call.png';
+import { useUserType } from '../context/UserTypeContext';
+import { useLogout } from '../hooks/useLogout';
 
 export default function MechProfile() {
   const navigation = useNavigation();
   const [mechanic, setMechanic] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { userType } = useUserType();
+  const { handleLogout } = useLogout();
+
+  console.log('🔄 [MechProfile] Component rendered - userType:', userType);
 
   useEffect(() => {
+    console.log('🔄 [MechProfile] useEffect triggered');
+    
     const fetchProfile = async () => {
+      console.log('🔄 [MechProfile] fetchProfile started');
+      
+      // Only fetch if we're a mechanic
+      if (userType !== 'mechanic') {
+        console.log('⚠️ [MechProfile] Not a mechanic, skipping profile fetch');
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const token = await AsyncStorage.getItem('jwtToken');
-        const userType = await AsyncStorage.getItem('userType');
-        console.log('=== MECHANIC PROFILE DEBUG ===');
-        console.log('Token:', token);
-        console.log('UserType:', userType);
+        
+        console.log('📱 [MechProfile] Token check:', {
+          token: token ? 'EXISTS' : 'NULL',
+          userType
+        });
         
         if (!token) {
-          console.log('No token found');
-          Alert.alert('Error', 'No authentication token found');
+          console.log('❌ [MechProfile] No token found');
+          setIsLoading(false);
           return;
         }
         
-        if (userType !== 'mechanic') {
-          console.log('User type is not mechanic:', userType);
-          Alert.alert('Error', 'User type is not mechanic: ' + userType);
-          return;
-        }
-        
-        console.log('Making API call to users/me/');
+        console.log('✅ [MechProfile] Making API call to users/me/');
         const res = await API.get('users/me/', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        console.log('API Response:', res);
-        console.log('Mechanic data:', res.data);
+        
+        console.log('✅ [MechProfile] Mechanic data fetched:', res.data);
         setMechanic(res.data);
         
       } catch (err) {
-        console.log('=== API ERROR ===');
-        console.log('Error details:', err);
-        console.log('Error message:', err?.message);
-        console.log('Error response:', err?.response?.data);
-        console.log('Error status:', err?.response?.status);
+        console.error('❌ [MechProfile] API Error:', {
+          message: err?.message,
+          status: err?.response?.status,
+          data: err?.response?.data
+        });
         
         let errorMessage = 'Failed to fetch mechanic profile';
         if (err?.response?.status === 401) {
@@ -62,125 +77,103 @@ export default function MechProfile() {
         }
         
         Alert.alert('Error', errorMessage);
+      } finally {
+        setIsLoading(false);
+        console.log('🏁 [MechProfile] fetchProfile completed');
       }
     };
+
     fetchProfile();
-  }, []);
+  }, [userType]);
+
+  // Show loading state
+  if (isLoading) {
+    console.log('⏳ [MechProfile] Showing loading state');
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading mechanic profile...</Text>
+      </View>
+    );
+  }
+
+  // Don't render if not a mechanic
+  if (userType !== 'mechanic') {
+    console.log('⚠️ [MechProfile] Not a mechanic account, showing message');
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Not a mechanic account</Text>
+      </View>
+    );
+  }
+
+  // Show loading state while fetching mechanic data
+  if (!mechanic) {
+    console.log('⏳ [MechProfile] Showing mechanic data loading state');
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loadingText}>Loading mechanic profile...</Text>
+      </View>
+    );
+  }
+
+  console.log('✅ [MechProfile] Rendering mechanic profile UI');
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#FF4D4F', '#FF6B6B']}
-        style={styles.headerGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.navigate('Home')}
-          >
-            <Image source={backArrowIcon} style={styles.backIcon} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <View style={styles.placeholder} />
+      {/* Header */}
+      <View style={styles.headerProfile}>
+        <TouchableOpacity style={styles.backArrow} onPress={() => {
+          if (navigation.navigate) {
+            navigation.navigate('Home');
+          } else if (navigation.goBack) {
+            navigation.goBack();
+          }
+        }}>
+          <Image source={backArrowIcon} style={styles.backArrowIcon} />
+        </TouchableOpacity>
+        <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', position: 'relative' },styles.profileHead]}> 
+          <Text style={styles.headerTitleProfile}>Profile</Text>
         </View>
-      </LinearGradient>
-
-      <ScrollView 
-        style={styles.content} 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Dynamic Mechanic Profile Card */}
+      </View>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+        {/* Profile Card */}
         <View style={styles.profileCard}>
-          <View style={styles.profileSection}>
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {mechanic ? mechanic.username?.substring(0, 2).toUpperCase() || 'MG' : 'MG'}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.garageName}>
-                {mechanic ? mechanic.username || 'Loading...' : 'Loading...'}
-              </Text>
-              <Text style={styles.contactInfo}>
-                {mechanic ? `+91 ${mechanic.phone || ''}` : ''}
-              </Text>
-              <Text style={styles.contactInfo}>
-                {mechanic ? mechanic.email || '' : ''}
-              </Text>
-              <View style={styles.ratingSection}>
-                <View style={styles.stars}>
-                  <Text style={styles.star}>★</Text>
-                  <Text style={styles.star}>★</Text>
-                  <Text style={styles.star}>★</Text>
-                  <Text style={styles.star}>★</Text>
-                  <Text style={styles.star}>★</Text>
-                </View>
-                <Text style={styles.ratingText}>4.8 (120 reviews)</Text>
-              </View>
-            </View>
+          <View style={styles.avatarCircle}>
+            <Image source={user2Icon} style={styles.avatar} />
           </View>
+          <Text style={styles.profileName}>{mechanic.username || 'Loading...'}</Text>
+          <TouchableOpacity
+            onPress={async () => {
+              const phoneNumber = mechanic ? mechanic.phone : '';
+              const url = `tel:${phoneNumber}`;
+              const supported = await Linking.canOpenURL(url);
+              if (supported) {
+                Linking.openURL(url);
+              } else {
+                Alert.alert('Error', 'Calling is not supported on this device.');
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.profilePhone, { color: '#2563EB'}]}>
+              {mechanic ? `+91 ${mechanic.phone}` : ''}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.profileEmail}>{mechanic ? mechanic.email : ''}</Text>
+          <Text style={styles.garageName}>{mechanic ? mechanic.garage_name : ''}</Text>
         </View>
-
-        {/* Performance Stats Card */}
-        <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>Performance Stats</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <View style={[styles.statCircle, { backgroundColor: '#DCFCE7' }]}>
-                <Text style={[styles.statNumber, { color: '#16A34A' }]}>98%</Text>
-              </View>
-              <Text style={styles.statLabel}>Success Rate</Text>
-            </View>
-            <View style={styles.statItem}>
-              <View style={[styles.statCircle, { backgroundColor: '#FEF3C7' }]}>
-                <Text style={[styles.statNumber, { color: '#D97706' }]}>₹45k</Text>
-              </View>
-              <Text style={styles.statLabel}>Total Earnings</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Settings Menu Card */}
+        {/* Options Card */}
         <View style={styles.optionsCard}>
           <ProfileOption icon={settingIcon} label="Settings" />
+          <ProfileOption icon={emergencyIcon} label="Emergency Contacts" />
           <ProfileOption icon={padlockIcon} label="Modify Credentials" />
-          <ProfileOption icon={historyIcon} label="Transaction History" />
-          <ProfileOption icon={customerServiceIcon} label="Contact Us" />
+          <ProfileOption icon={historyIcon} label="Service History" />
+          <ProfileOption icon={customerServiceIcon} label="Contact Support" />
           <ProfileOption icon={engineerIcon} label="Help and FAQs" isLast />
         </View>
-
         {/* Log Out Button */}
-        <TouchableOpacity 
-          style={styles.logoutBtn}
-          onPress={() => {
-            Alert.alert(
-              'Confirm Logout',
-              'Are you sure you want to log out?',
-              [
-                {
-                  text: 'No',
-                  style: 'cancel',
-                },
-                {
-                  text: 'Yes',
-                  onPress: async () => {
-                    await AsyncStorage.removeItem('jwtToken');
-                    await AsyncStorage.removeItem('userType');
-                    navigation.navigate('Login');
-                  },
-                  style: 'destructive',
-                },
-              ],
-              { cancelable: true }
-            );
-          }}
-        >
-          <Image source={logoutIcon} style={styles.logoutIcon} />
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => handleLogout(true)}>
+          <Image source={logoutIcon} style={[styles.logoutIcon, { tintColor: '#fff', marginRight: 12 }]} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -200,27 +193,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F6F8FF',
+    padding: 0,
   },
-  headerGradient: {
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+  headerProfile: {
+    backgroundColor: '#FF4D4F',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 20,
-    height: 110,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flex: 1,
-  },
-  backButton: {
+  backArrow: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -228,159 +213,94 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIcon: {
+  backArrowIcon: {
     width: 18,
     height: 18,
     tintColor: '#fff',
     resizeMode: 'contain',
   },
-  headerTitle: {
+  profileHead: {
+    flex: 1,
+  },
+  headerTitleProfile: {
     color: '#fff',
     fontSize: 28,
     fontWeight: '600',
     fontFamily: 'Cormorant-Bold',
-    textAlign: 'center',
-  },
-  placeholder: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 18,
-    paddingTop: 120,
-    paddingBottom: 100,
   },
   profileCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
-    padding: 20,
-    marginBottom: 16,
+    alignItems: 'center',
+    margin: 18,
+    marginTop: 15,
+    marginBottom: 15,
+    paddingVertical: 28,
+    paddingHorizontal: 16,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 4,
+    elevation: 6,
   },
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    marginRight: 16,
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#3B82F6',
+  avatarCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#2563EB',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
   },
-  avatarText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    fontFamily: 'Poppins-Bold',
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    tintColor: '#fff',
   },
-  profileInfo: {
-    flex: 1,
-  },
-  garageName: {
-    fontSize: 20,
+  profileName: {
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#22223B',
-    fontFamily: 'Poppins-Bold',
-    marginBottom: 4,
+    fontFamily: 'Cormorant-Bold',
+    marginBottom: 2,
   },
-  contactInfo: {
+  profilePhone: {
+    fontSize: 15,
+    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+    marginBottom: 1,
+  },
+  profileEmail: {
     fontSize: 14,
     color: '#6B7280',
     fontFamily: 'Poppins-Regular',
     marginBottom: 2,
   },
-  ratingSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  stars: {
-    flexDirection: 'row',
-    marginRight: 8,
-  },
-  star: {
+  garageName: {
     fontSize: 16,
-    color: '#FBBF24',
-    marginRight: 2,
-  },
-  ratingText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontFamily: 'Poppins-Regular',
-  },
-  statsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  statsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#22223B',
-    fontFamily: 'Poppins-Bold',
-    marginBottom: 16,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  statNumber: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    fontFamily: 'Poppins-Bold',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontFamily: 'Poppins-Regular',
+    fontWeight: '600',
+    color: '#2563EB',
+    fontFamily: 'Poppins-Medium',
     textAlign: 'center',
   },
   optionsCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
-    marginHorizontal: 0,
-    marginBottom: 38,
-    paddingVertical: 2,
+    margin: 18,
+    marginTop: 0,
+    marginBottom: 15,
     shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
   },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderBottomWidth: 1.2,
-    borderBottomColor: '#F0F1F6',
-    backgroundColor: 'transparent',
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   optionIcon: {
     width: 24,
@@ -406,7 +326,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FF4D4F',
     borderRadius: 10,
-    marginHorizontal: 0,
+    marginHorizontal: 18,
     marginBottom: 18,
     paddingVertical: 14,
     justifyContent: 'center',
@@ -427,5 +347,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     fontFamily: 'Poppins-Bold',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 50,
   },
 });

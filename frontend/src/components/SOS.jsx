@@ -6,6 +6,8 @@ import phoneIcon from '../images/phone.png';
 import locIcon from '../images/loc.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from '../services/api';
+import Geolocation from '@react-native-community/geolocation';
+
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +27,7 @@ const SOS = ({ navigation }) => {
   const [inputNumber, setInputNumber] = useState('');
   const [error, setError] = useState('');
   const [showSOSMessage, setShowSOSMessage] = useState(false);
+  const [currentUser,setCurrentUser] = useState(null);
   const ringAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -34,6 +37,7 @@ const SOS = ({ navigation }) => {
         const res = await API.get('users/me/', {
           headers: { Authorization: `Bearer ${token}` }
         });
+        setCurrentUser(res.data);
         const userContacts = (res.data.emergency_contacts || []).map((c, idx) => ({
           name: c.name || `Emergency Contact ${idx + 1}`,
           number: c.number || '',
@@ -51,6 +55,72 @@ const SOS = ({ navigation }) => {
     };
     fetchUserContacts();
   }, []);
+
+  // Single handler for all "Call" buttons
+// Replace your existing handleCallPress with this
+const handleCallPress = async (contact) => {
+  const raw = (contact.number || '').trim();
+  const digits = raw.replace(/\D/g, '');
+
+  // tel: target → keep short codes as-is; use E.164 only for normal numbers
+  const normalizeForTel = () => {
+    if (!digits) return null;
+    if (digits.length <= 4) return digits; // 100, 101, 108, etc.
+    if (raw.startsWith('+')) return raw;
+    if (digits.length === 10) return '+91' + digits;
+    return '+' + digits;
+  };
+
+  // WhatsApp target → only valid E.164, skip short codes
+  const normalizeForWhatsApp = () => {
+    if (raw.startsWith('+')) return raw;
+    if (digits.length === 10) return '+91' + digits;
+    return null; // skip WA for short/emergency codes
+  };
+
+  const telNumber = normalizeForTel();
+  if (!telNumber) {
+    Alert.alert('Error', 'Invalid phone number.');
+    return;
+  }
+
+  try {
+    await Linking.openURL(`tel:${telNumber}`);
+  } catch (e) {
+    const supported = await Linking.canOpenURL(`tel:${telNumber}`);
+    if (!supported) {
+      Alert.alert('Error', 'Calling is not supported on this device.');
+    }
+  }
+
+  // Only user-added emergency contacts get WhatsApp + fallback
+  if (contact.type === 'user') {
+    const waNumber = normalizeForWhatsApp();
+    if (!waNumber) return;
+
+    Geolocation.getCurrentPosition(
+      async pos => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const payload = {
+            to: waNumber.replace(/\s+/g, ''),
+            username: currentUser?.username || 'MechaFix User',
+            lat: latitude,
+            lon: longitude,
+          };
+          const res = await API.post('users/sos/whatsapp/', payload);
+          if (res.data?.status === 'fallback' && res.data?.click_to_chat) {
+            Linking.openURL(res.data.click_to_chat);
+          }
+        } catch (e) {
+          Alert.alert('Notice', 'Could not send WhatsApp. You can try WhatsApp Chat manually.');
+        }
+      },
+      err => console.warn('Location error:', err?.message),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+    );
+  }
+};
 
   // Filter user contacts
   const userContacts = contacts.filter(c => c.type === 'user');
@@ -200,18 +270,7 @@ const SOS = ({ navigation }) => {
                 )}
               </View>
               <TouchableOpacity style={[styles.callBtn, { backgroundColor: contact.color }]} 
-                onPress={async () => {
-                  let phoneNumber = contact.number.replace(/\D/g, '');
-                  if (phoneNumber.length === 10) phoneNumber = '+91' + phoneNumber;
-                  else if (!phoneNumber.startsWith('+')) phoneNumber = '+' + phoneNumber;
-                  const url = `tel:${phoneNumber}`;
-                  const supported = await Linking.canOpenURL(url);
-                  if (supported) {
-                    Linking.openURL(url);
-                  } else {
-                    Alert.alert('Error', 'Calling is not supported on this device.');
-                  }
-                }}>
+                onPress={() => handleCallPress(contact)}>
                 <Text style={styles.callBtnText}>Call</Text>
               </TouchableOpacity>
             </View>

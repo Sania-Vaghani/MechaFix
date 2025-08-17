@@ -11,4 +11,5 @@ urlpatterns = [
     path('reset-password/', views.reset_password, name='reset_password'),
     path('me/', views.user_me, name='user_me'),
     path('mech/update-availability/', views.update_mechanic_availability, name='update_mechanic_availability'),
+    path('sos/whatsapp/',views.send_sos_whatsapp,name='send_sos_whatsapp')
 ]

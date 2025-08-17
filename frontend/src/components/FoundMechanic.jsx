@@ -143,7 +143,6 @@ const FoundMechanic = ({ route, navigation }) => {
       setOffset(preFetchedMechanics.length);
       if (preFetchedMechanics.length < 5) setAllLoaded(true);
     } else {
-      // Otherwise fetch mechanics normally
       fetchMechanics();
       setMechanics([]);
     }
