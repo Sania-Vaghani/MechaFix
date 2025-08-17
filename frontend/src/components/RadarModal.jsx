@@ -134,7 +134,9 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
         return;
       }
 
-      console.log('🔍 Fetching nearby mechanics...');
+      console.log('🔍 Fetching nearby mechanics during radar scan...');
+      console.log('📍 Using coordinates:', coords);
+      
       const response = await fetch('http://10.0.2.2:8000/api/recommendations/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -162,7 +164,7 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
         }
       }
     } catch (error) {
-      console.error('❌ Error fetching mechanics:', error.message);
+      console.error('❌ Error fetching mechanics during radar scan:', error.message);
     }
   };
 
@@ -594,6 +596,12 @@ const styles = StyleSheet.create({
     color: '#333',      // Or use your ACCENT variable
     fontWeight: '300',
     lineHeight: 36,        // Match fontSize for vertical centering
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 50,
   },
 });
 

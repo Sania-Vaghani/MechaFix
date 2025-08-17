@@ -10,11 +10,11 @@ import CreatePassword from './src/components/CreatePassword';
 import UserHome from './src/components/UserHome';
 import { UserTypeProvider, UserTypeContext } from './src/context/UserTypeContext';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Messages from './src/components/Messages'; // Placeholder, create if not exists
-import Profile from './src/components/Profile'; // Placeholder, create if not exists
-import SOS from './src/components/SOS'; // Placeholder, create if not exists
-import Breakdown from './src/components/Breakdown'; // Placeholder, create if not exists
-import { Image } from 'react-native';
+import Messages from './src/components/Messages';
+import Profile from './src/components/Profile';
+import SOS from './src/components/SOS';
+import Breakdown from './src/components/Breakdown';
+import { Image, View, Text, ActivityIndicator } from 'react-native';
 import MechHome from "./src/components/MechHome"
 import homeIcon from './src/images/home.png';
 import chatIcon from './src/images/chat.png';
@@ -33,14 +33,39 @@ import Services from './src/components/Services';
 import FoundMechanic from './src/components/FoundMechanic';
 import ForgotPasswordOtpScreen from './src/components/ForgotPasswordOtpScreen';
 import ForgotPasswordScreen from './src/components/ForgotPasswordscreen';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import LogoutScreen from './src/components/LogoutScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
+// Loading component
+const LoadingScreen = () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' }}>
+    <ActivityIndicator size="large" color="#007AFF" />
+    <Text style={{ marginTop: 10, fontSize: 16, color: '#666' }}>Loading...</Text>
+  </View>
+);
+
 function MainTabNavigator() {
-  const { userType } = useContext(UserTypeContext);
+  const { userType, isLoading, initializationCount } = useContext(UserTypeContext);
+
+  console.log(' [MainTabNavigator] Render - userType:', userType, 'isLoading:', isLoading, 'initCount:', initializationCount);
+
+  // Show loading screen while context is initializing
+  if (isLoading) {
+    console.log('⏳ [MainTabNavigator] Showing loading screen');
+    return <LoadingScreen />;
+  }
+
+  // If no userType after loading, show loading screen (the logout hook will handle navigation)
+  if (!userType) {
+    console.log('⚠️ [MainTabNavigator] No userType, showing loading screen');
+    return <LoadingScreen />;
+  }
 
   if (userType === 'user') {
+    console.log('✅ [MainTabNavigator] Rendering USER tabs');
     return (
       <Tab.Navigator
         screenOptions={{ headerShown: false }}
@@ -54,40 +79,51 @@ function MainTabNavigator() {
       </Tab.Navigator>
     );
   }
-  return (
-    <Tab.Navigator
-      screenOptions={{ headerShown: false }}
-      tabBar={props => <MechTabBar {...props} />}
-    >
-      <Tab.Screen name="Home" component={MechHome} />
-      <Tab.Screen name="Availability" component={Availability} />
-      <Tab.Screen name="Services" component={Services} />
-      <Tab.Screen name="Requests" component={Requests} />
-      <Tab.Screen name="Profile" component={MechProfile} />
-    </Tab.Navigator>
-  );
+  
+  if (userType === 'mechanic') {
+    console.log('✅ [MainTabNavigator] Rendering MECHANIC tabs');
+    return (
+      <Tab.Navigator
+        screenOptions={{ headerShown: false }}
+        tabBar={props => <MechTabBar {...props} />}
+      >
+        <Tab.Screen name="Home" component={MechHome} />
+        <Tab.Screen name="Availability" component={Availability} />
+        <Tab.Screen name="Services" component={Services} />
+        <Tab.Screen name="Requests" component={Requests} />
+        <Tab.Screen name="Profile" component={MechProfile} />
+      </Tab.Navigator>
+    );
+  }
+
+  console.log('❌ [MainTabNavigator] Unknown userType:', userType);
+  return <LoadingScreen />;
 }
 
-
 export default function App() {
+  console.log('🚀 [App] Rendering main App component');
+  
   return (
-    <UserTypeProvider>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Splash" component={SplashScreen} />
-          <Stack.Screen name="UserTypeSelection" component={UserTypeSelection} />
-          <Stack.Screen name="Login" component={Login} />
-          <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-          <Stack.Screen name="SignUp" component={SignUp} />
-          <Stack.Screen name="Otp" component={OtpScreen} />
-          <Stack.Screen name="PhoneNum" component={PhoneNum} />
-          <Stack.Screen name="CreatePassword" component={CreatePassword} />
-          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-          <Stack.Screen name="ForgotPasswordOtp" component={ForgotPasswordOtpScreen} />
-          <Stack.Screen name="FullMap" component={FullMapScreen} />
-          <Stack.Screen name="FoundMechanic" component={FoundMechanic} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </UserTypeProvider>
+    <ErrorBoundary>
+      <UserTypeProvider>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Splash" component={SplashScreen} />
+            <Stack.Screen name="UserTypeSelection" component={UserTypeSelection} />
+            <Stack.Screen name="Login" component={Login} />
+            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+            <Stack.Screen name="Logout" component={LogoutScreen} />
+            <Stack.Screen name="SignUp" component={SignUp} />
+            <Stack.Screen name="Otp" component={OtpScreen} />
+            <Stack.Screen name="PhoneNum" component={PhoneNum} />
+            <Stack.Screen name="CreatePassword" component={CreatePassword} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <Stack.Screen name="ForgotPasswordOtp" component={ForgotPasswordOtpScreen} />
+            <Stack.Screen name="FullMap" component={FullMapScreen} />
+            <Stack.Screen name="FoundMechanic" component={FoundMechanic} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </UserTypeProvider>
+    </ErrorBoundary>
   );
 }
