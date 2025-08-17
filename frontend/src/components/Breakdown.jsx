@@ -246,8 +246,16 @@ useEffect(() => {
                       lat: latitude,
                       lon: longitude,
                       breakdown_type: issueType || 'engine',
-                      isFallback: true
+                      carDetails: {
+                        car_model: carModel,
+                        year,
+                        license_plate: licensePlate,
+                        description,
+                        issue_type: issueType,
+                        image_url: selectedImage?.uri || null
+                      }
                     });
+                    
                     
                   } catch (err) {
                     console.error("❌ Error fetching mechanics:", err.message);

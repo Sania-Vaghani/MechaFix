@@ -23,40 +23,58 @@ export default function Requests() {
           console.log("No token found");
           return;
         }
-
+  
         const res = await axios.get('http://10.0.2.2:8000/api/users/me/', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        console.log("Mechanic profile:", res.data);
-
-        // Assuming backend returns _id for mechanic
-        setMechanicId(res.data._id);  
-
+  
+        console.log("🔹 Mechanic profile response:", res.data);
+  
+        // Ensure string ID is set
+        const mechId = res.data.mechanic_id || res.data._id || res.data.id;
+        console.log("✅ Setting mechanicId:", mechId);
+  
+        setMechanicId(String(mechId));
+  
       } catch (err) {
         console.error("Error fetching mechanic profile:", err?.response?.data || err.message);
       }
     };
-
+  
     fetchMechanic();
   }, []);
-
+  
   // Fetch pending requests dynamically
   useEffect(() => {
     const fetchRequests = async () => {
+      if (!mechanicId) {
+        console.log("⏳ Waiting for mechanicId...");
+        return;
+      }
+  
       try {
-        const res = await axios.get('http://10.0.2.2:8000/api/pending-requests/');
+        const url = `http://10.0.2.2:8000/api/pending-requests/?mech_id=${mechanicId}`;
+        console.log("📡 Fetching requests from:", url);
+  
+        const res = await axios.get(url);
+        console.log("🔹 Pending requests API response:", res.data);
+  
         if (res.data.status === 'success') {
           const formatted = res.data.requests.map(req => {
             let myDistance = "N/A";
-
-            if (mechanicId && req.mechanics_list?.length) {
-              // match by mechanic ID
-              const myEntry = req.mechanics_list.find(m => String(m.mech_id) === String(mechanicId));
-              if (myEntry) {
+  
+            if (req.mechanics_list?.length) {
+              const myEntry = req.mechanics_list.find(
+                m => String(m.mech_id) === String(mechanicId)
+              );
+              console.log("➡️ Matching mech entry for me:", myEntry);
+  
+              if (myEntry?.road_distance_km != null) {
                 myDistance = `${Number(myEntry.road_distance_km).toFixed(2)} km`;
-              }              
             }
 
+            }
+  
             return {
               id: req._id,
               name: req.user_name || 'Unknown User',
@@ -71,17 +89,18 @@ export default function Requests() {
           setPendingRequests(formatted);
         }
       } catch (err) {
-        console.error('Error fetching requests:', err);
+        console.error('❌ Error fetching requests:', err?.response?.data || err.message);
       }
     };
-
+  
     fetchRequests();
-    const interval = setInterval(fetchRequests, 5000); 
+    const interval = setInterval(fetchRequests, 5000);
     return () => clearInterval(interval);
   }, [mechanicId]);
+  
 
   // Reject request handler
-  const handleRejectRequest = (requestId) => {
+  const handleRejectRequest = async (requestId) => {
     Alert.alert(
       'Reject Request',
       'Are you sure you want to reject this request?',
@@ -90,13 +109,23 @@ export default function Requests() {
         {
           text: 'Reject',
           style: 'destructive',
-          onPress: () => {
-            setPendingRequests(prev => prev.filter(r => r.id !== requestId));
+          onPress: async () => {
+            try {
+              await axios.post('http://10.0.2.2:8000/api/mechanic-reject/', {
+                request_id: requestId,
+                mech_id: mechanicId
+              });
+              setPendingRequests(prev => prev.filter(r => r.id !== requestId));
+            } catch (err) {
+              console.error("Reject failed:", err);
+            }
           },
         },
       ]
     );
   };
+  
+  
 
   const handleCall = (phoneNumber) => {
     Alert.alert('Call', `Calling ${phoneNumber}`);

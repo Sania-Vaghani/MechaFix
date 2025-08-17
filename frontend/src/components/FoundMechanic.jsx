@@ -2,9 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image, ActivityIndicator } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import arrowIcon from '../images/arrow.png';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+
 
 const FoundMechanic = ({ route, navigation }) => {
-  const { lat, lon, breakdown_type, isFallback, preFetchedMechanics } = route.params;
+  const { lat, lon, breakdown_type, isFallback, preFetchedMechanics,carDetails  } = route.params;
   
   // Add this logging
   console.log('FoundMechanic received params:', { lat, lon, breakdown_type });
@@ -13,6 +16,26 @@ const FoundMechanic = ({ route, navigation }) => {
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [allLoaded, setAllLoaded] = useState(false);
+
+  const loadUser = async () => {
+    let storedUser = await AsyncStorage.getItem("user");
+    if (!storedUser) {
+      const token = await AsyncStorage.getItem("jwtToken");
+      const userType = await AsyncStorage.getItem("userType");
+      if (token && userType === "user") {
+        const res = await fetch("http://10.0.2.2:8000/api/users/me/", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          storedUser = JSON.stringify(data);
+          await AsyncStorage.setItem("user", storedUser);
+        }
+      }
+    }
+    return storedUser ? JSON.parse(storedUser) : null;
+  };
+  
 
   const fetchMechanics = async () => {
     if (loading || allLoaded) return;
@@ -68,6 +91,50 @@ const FoundMechanic = ({ route, navigation }) => {
     }
   };
 
+  const sendRequestToMechanic = async (mech) => {
+    try {
+      const user = await loadUser();
+      if (!user) {
+        Alert.alert("Error", "User not found");
+        return;
+      }
+  
+      const payload = {
+        lat,
+        lon,
+        breakdown_type,
+        user_id: user._id,
+        user_name: user.username,
+        user_phone: user.phone,
+        car_model: carDetails?.car_model || null,
+        year: carDetails?.year || null,
+        license_plate: carDetails?.license_plate || null,
+        description: carDetails?.description || null,
+        issue_type: carDetails?.issue_type || null,
+        image_url: carDetails?.image_url || null,
+        mechanics_list: [
+          {
+            mech_id: mech._id,
+            mech_name: mech.mech_name,
+            road_distance_km: mech.road_distance_km ? parseFloat(mech.road_distance_km).toFixed(2) : null,
+            rating: mech.rating,
+            comment: mech.comment,
+            status: "pending"
+          }
+        ]
+      };
+  
+      const res = await axios.post("http://10.0.2.2:8000/api/service-request/", payload);
+      console.log("✅ Sent request:", res.data);
+  
+      Alert.alert("Request Sent", `Your request to ${mech.mech_name} is now pending until mechanic responds.`);
+    } catch (err) {
+      console.error("❌ Error sending request:", err.response?.data || err.message);
+      Alert.alert("Error", "Failed to send request");
+    }
+  };
+  
+
   useEffect(() => {
     // If we have pre-fetched mechanics, use them
     if (preFetchedMechanics && preFetchedMechanics.length > 0) {
@@ -78,6 +145,7 @@ const FoundMechanic = ({ route, navigation }) => {
     } else {
       // Otherwise fetch mechanics normally
       fetchMechanics();
+      setMechanics([]);
     }
   }, [preFetchedMechanics]);
 
@@ -100,10 +168,11 @@ const FoundMechanic = ({ route, navigation }) => {
                 <Text style={styles.detail}>Distance: {mech.road_distance_km?.toFixed(2)} km</Text>
                 <TouchableOpacity
                   style={styles.sendBtn}
-                  onPress={() => Alert.alert("Request Sent", `Request sent to ${mech.mech_name}`)}
+                  onPress={() => sendRequestToMechanic(mech)}
                 >
                   <Text style={styles.sendBtnText}>Send Request</Text>
                 </TouchableOpacity>
+
               </View>
             ))}
             {!allLoaded && !loading &&(
