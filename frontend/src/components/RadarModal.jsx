@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions, StatusBar, Alert } from 'react-native';
-import axios from 'axios'; // Add this import
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
 const RADAR_SIZE = 250; // fills the modal better
 const MECHANIC_COUNT = 5;
@@ -20,7 +21,7 @@ function randomPolar(radius) {
   };
 }
 
-const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakdownType }) => {
+const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakdownType,user,carDetails }) => {
   const sweepAnim = useRef(new Animated.Value(0)).current;
   const radarPulse = useRef(new Animated.Value(1)).current;
   const [mechanicDots, setMechanicDots] = useState([]);
@@ -28,7 +29,89 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
   const dotPulses = useRef([...Array(MECHANIC_COUNT)].map(() => new Animated.Value(1))).current;
   const timerRef = useRef(null);
   const [fetchedMechanics, setFetchedMechanics] = useState([]); // Add this state
+  const [localUser, setLocalUser] = useState(null);
 
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        let storedUser = await AsyncStorage.getItem("user");
+  
+        if (!storedUser) {
+          console.warn("⚠️ No user in AsyncStorage, fetching from API...");
+          const token = await AsyncStorage.getItem("jwtToken");
+          const userType = await AsyncStorage.getItem("userType");
+  
+          if (token && userType === "user") {
+            const res = await fetch("http://10.0.2.2:8000/api/users/me/", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+  
+            if (res.ok) {
+              const data = await res.json();
+              storedUser = JSON.stringify(data);
+              await AsyncStorage.setItem("user", storedUser);
+            } else {
+              console.error("❌ Failed to fetch user from API:", await res.text());
+            }
+          }
+        }
+  
+        if (storedUser && storedUser !== "undefined" && storedUser !== "null") {
+          setLocalUser(JSON.parse(storedUser));
+        } else {
+          console.warn("⚠️ No valid user data in AsyncStorage.");
+        }
+        
+      } catch (err) {
+        console.error("❌ Failed to load user:", err);
+      }
+    };
+  
+    loadUser();
+  }, []);
+  
+
+  const createServiceRequest = async (coords, mechanics) => {
+    try {
+      if (!coords || !localUser) {
+        console.error("❌ Missing coordinates or user for service request");
+        return;
+      }
+
+      const payload = {
+        lat: coords.lat,
+        lon: coords.lon,
+        breakdown_type: breakdownType || 'engine',
+        user_id: localUser?._id || null,
+        user_name: localUser?.username || null,
+        user_phone: localUser?.phone || null,
+        
+        // ✅ Send car details
+        car_model: carDetails?.carModel || null,
+        year: carDetails?.year || null,
+        license_plate: carDetails?.licensePlate || null,
+        description: carDetails?.description || null,
+        issue_type: carDetails?.issueType || null,
+        image_url: carDetails?.image || null,
+
+        // ✅ Full mechanics list with distances
+        mechanics_list: mechanics.map(m => ({
+          mech_id: m._id,
+          mech_name: m.mech_name,
+          road_distance_km: m.road_distance_km,
+          rating: m.rating,
+          comment: m.comment,
+        })),
+      };
+
+      const res = await axios.post('http://10.0.2.2:8000/api/service-request/', payload);
+      console.log("✅ Service request created:", res.data);
+    } catch (err) {
+      console.error("❌ Error creating service request:", err);
+    }
+  };
+  
+  
   // Transform coordinates if they come in the wrong format
   const getCoordinates = () => {
     if (userLocation) {
@@ -51,9 +134,7 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
         return;
       }
 
-      console.log('🔍 Fetching nearby mechanics during radar scan...');
-      console.log('📍 Using coordinates:', coords);
-      
+      console.log('🔍 Fetching nearby mechanics...');
       const response = await fetch('http://10.0.2.2:8000/api/recommendations/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -65,38 +146,23 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
           limit: 5,
         }),
       });
-      
+
       const text = await response.text();
       console.log('Fetch response:', response.status, text);
 
-      if (!response.ok) {
-        console.error('Server error:', response.status, text);
-        return;
-      }
+      if (!response.ok) return;
 
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch (e) {
-        console.error('Failed to parse JSON:', text);
-        return;
-      }
-
+      const result = JSON.parse(text);
       if (result.status === 'success') {
         const mechanics = result.mechanics;
         setFetchedMechanics(mechanics);
-        console.log('✅ Mechanics fetched during radar scan:', mechanics);
-        console.log('📍 Total mechanics found:', mechanics.length);
-        
-        // Log each mechanic individually
-        mechanics.forEach((mech, index) => {
-          console.log(` Mechanic ${index + 1}: ${mech.mech_name} - ${mech.road_distance_km?.toFixed(2)}km away - Rating: ${mech.rating}`);
-        });
-      } else {
-        console.log('❌ Failed to fetch mechanics during radar scan:', result.message);
+        // ✅ Now call service request only after user is loaded
+        if (localUser) {
+          createServiceRequest(coords, mechanics);
+        }
       }
     } catch (error) {
-      console.error('❌ Error fetching mechanics during radar scan:', error.message);
+      console.error('❌ Error fetching mechanics:', error.message);
     }
   };
 
@@ -110,15 +176,12 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
 
       // Fetch mechanics with a small delay to ensure backend is ready
       const coords = getCoordinates();
-      if (coords) {
-        console.log('✅ Valid coordinates, fetching mechanics...');
-        // Add a small delay to ensure backend is ready
-        setTimeout(() => {
-          fetchNearbyMechanics();
-        }, 500);
-      } else {
-        console.log('❌ Invalid coordinates:', userLocation);
-      }
+    if (coords && localUser) {
+      console.log("✅ User & coordinates ready, fetching mechanics...");
+      setTimeout(fetchNearbyMechanics, 500);
+    } else {
+      console.log("⏳ Waiting for user or coords...");
+    }
 
       // Start 10-second timer
       timerRef.current = setTimeout(() => {
@@ -129,7 +192,7 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
         if (onNoMechanicsFound) {
           onNoMechanicsFound(fetchedMechanics);
         }
-      }, 10000);
+      }, 120000);
 
       sweepAnim.setValue(0);
       sweepLoop = Animated.loop(
@@ -186,7 +249,7 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
       dotOpacities.forEach(opacity => opacity.setValue(0));
       dotPulses.forEach(pulse => pulse.setValue(1));
     };
-  }, [visible, onClose, onNoMechanicsFound, userLocation, breakdownType]); // Add onClose to dependency array
+  }, [visible, onClose, onNoMechanicsFound, userLocation, breakdownType,localUser,carDetails]); // Add onClose to dependency array
 
   const rotate = sweepAnim.interpolate({
     inputRange: [0, 1],

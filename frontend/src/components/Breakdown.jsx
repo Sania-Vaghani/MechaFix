@@ -51,46 +51,65 @@ const Breakdown = ({ navigation }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [mechanics, setMechanics] = useState([]);
   const [showRadarModal, setShowRadarModal] = useState(false);
+  const [loggedInUser, setLoggedInUser] = useState(null);
+
 
   const prevCoords = useRef(null);
 
-  useEffect(() => {
-    const watchId = Geolocation.watchPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-
-        if (prevCoords.current) {
-          const distanceMoved = haversine(
-            prevCoords.current.latitude,
-            prevCoords.current.longitude,
-            latitude,
-            longitude
-          );
-
-          if (distanceMoved >= 2) {
-            console.log(`📍 Moved ${distanceMoved.toFixed(2)} km. Refreshing mechanics...`);
-            prevCoords.current = { latitude, longitude };
-            await handleSend(); // reuse your existing API logic
-          }
-        } else {
-          prevCoords.current = { latitude, longitude };
-        }
-      },
-      (error) => {
-        console.warn("📡 Location error:", error.message);
-      },
-      {
-        enableHighAccuracy: true,
-        distanceFilter: 50, // meters
-        interval: 30000,     // ms
-        fastestInterval: 15000,
+// ✅ Load user once
+useEffect(() => {
+  const loadUser = async () => {
+    try {
+      const storedUser = await AsyncStorage.getItem('user');
+      if (storedUser) {
+        setLoggedInUser(JSON.parse(storedUser));
       }
-    );
+    } catch (err) {
+      console.error("❌ Error loading logged in user:", err);
+    }
+  };
+  loadUser();
+}, []);
 
-    return () => {
-      Geolocation.clearWatch(watchId);
-    };
-  }, []);
+// ✅ Watch location
+useEffect(() => {
+  const watchId = Geolocation.watchPosition(
+    async (position) => {
+      const { latitude, longitude } = position.coords;
+
+      if (prevCoords.current) {
+        const distanceMoved = haversine(
+          prevCoords.current.latitude,
+          prevCoords.current.longitude,
+          latitude,
+          longitude
+        );
+
+        if (distanceMoved >= 2) {
+          console.log(`📍 Moved ${distanceMoved.toFixed(2)} km. Refreshing mechanics...`);
+          prevCoords.current = { latitude, longitude };
+          await handleSend();
+        }
+      } else {
+        prevCoords.current = { latitude, longitude };
+      }
+    },
+    (error) => {
+      console.warn("📡 Location error:", error.message);
+    },
+    {
+      enableHighAccuracy: true,
+      distanceFilter: 50,
+      interval: 30000,
+      fastestInterval: 15000,
+    }
+  );
+
+  return () => {
+    Geolocation.clearWatch(watchId);
+  };
+}, []);
+
 
 
 
@@ -394,15 +413,26 @@ const Breakdown = ({ navigation }) => {
       </ScrollView>
       {/* Radar Modal */}
       <RadarModal
-        visible={showRadarModal}
-        onClose={() => setShowRadarModal(false)}
-        onNoMechanicsFound={handleNoMechanicsFound}
-        userLocation={prevCoords.current ? {
-          lat: prevCoords.current.latitude,
-          lon: prevCoords.current.longitude
-        } : { lat: 0, lon: 0 }}
-        breakdownType={issueType}
-      />
+  visible={showRadarModal}
+  onClose={() => setShowRadarModal(false)}
+  onNoMechanicsFound={handleNoMechanicsFound}
+  user={loggedInUser}
+  userLocation={prevCoords.current ? {
+    lat: prevCoords.current.latitude,
+    lon: prevCoords.current.longitude
+  } : { lat: 0, lon: 0 }}
+  breakdownType={issueType}
+  carDetails={{
+    carModel,
+    year,
+    licensePlate,
+    description,
+    issueType,
+    image: selectedImage?.uri || null
+  }}
+/>
+
+
     </LinearGradient>
   );
 };
