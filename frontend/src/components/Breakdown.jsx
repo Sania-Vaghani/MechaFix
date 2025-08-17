@@ -170,7 +170,7 @@ const Breakdown = ({ navigation }) => {
       prevCoords.current = { latitude, longitude };
       
       console.log('📍 Got fresh location for radar:', { latitude, longitude });
-      setShowRadarModal(true);
+    setShowRadarModal(true);
       
     } catch (error) {
       console.error("❌ Location error:", error.message);
@@ -223,7 +223,7 @@ const Breakdown = ({ navigation }) => {
                     await AsyncStorage.setItem('topMechanics', JSON.stringify(mechList));
                     setMechanics(mechList);
                     
-                    navigation.navigate('FoundMechanic', {
+            navigation.navigate('FoundMechanic', {
                       lat: latitude,
                       lon: longitude,
                       breakdown_type: issueType || 'engine',
