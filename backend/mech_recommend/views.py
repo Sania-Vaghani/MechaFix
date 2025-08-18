@@ -354,3 +354,28 @@ def mechanic_reject_request(request):
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
     return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
+
+@csrf_exempt
+def get_service_request_detail(request, request_id):
+    if request.method == "GET":
+        try:
+            req = db.service_requests.find_one({"_id": ObjectId(request_id)})
+            if not req:
+                return JsonResponse({"status": "error", "message": "Request not found"}, status=404)
+
+            # Convert ObjectId → str
+            req["_id"] = str(req["_id"])
+            if req.get("user_id"):
+                req["user_id"] = str(req["user_id"])
+
+            # Ensure mechanics list ids are strings
+            for m in req.get("mechanics_list", []):
+                if isinstance(m.get("mech_id"), ObjectId):
+                    m["mech_id"] = str(m["mech_id"])
+
+            return JsonResponse({"status": "success", "request": req}, safe=False)
+
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+    return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)

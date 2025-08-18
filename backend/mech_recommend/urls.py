@@ -6,5 +6,6 @@ urlpatterns = [
     path('api/service-request/', views.create_service_request, name='create_service_request'),
     path('api/accept-request/', views.mechanic_accept_request, name='mechanic_accept_request'),
     path('api/pending-requests/', views.get_pending_requests, name='get_pending_requests'),
-    path('api/mechanic-reject/', views.mechanic_reject_request, name='mechanic_reject_request'),  # ✅ Add this
+    path('api/mechanic-reject/', views.mechanic_reject_request, name='mechanic_reject_request'),  
+    path('api/request-detail/<str:request_id>/', views.get_service_request_detail, name='get_service_request_detail'),
 ]

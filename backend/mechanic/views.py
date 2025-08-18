@@ -6,7 +6,40 @@ import json
 import jwt
 from bson.objectid import ObjectId
 import re
+from dotenv import load_dotenv
+import requests,os
 
+load_dotenv()
+ORS_API_KEY = os.getenv("ORS_API_KEY")
+
+@csrf_exempt
+def reverse_geocode(request):
+    lat = request.GET.get("lat")
+    lon = request.GET.get("lon")
+
+    if not lat or not lon:
+        return JsonResponse({"error": "lat and lon are required"}, status=400)
+
+    try:
+        url = "https://api.openrouteservice.org/geocode/reverse"
+        params = {
+            "api_key": os.getenv("ORS_API_KEY"),  # directly from .env
+            "point.lat": lat,
+            "point.lon": lon,
+            "size": 1,
+        }
+
+        res = requests.get(url, params=params, timeout=10)
+        data = res.json()
+
+        if res.status_code == 200 and "features" in data and len(data["features"]) > 0:
+            address = data["features"][0]["properties"]["label"]
+            return JsonResponse({"address": address})
+        else:
+            return JsonResponse({"error": "No address found", "details": data}, status=404)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 def _auth_mechanic(request):
     auth_header = request.META.get('HTTP_AUTHORIZATION', '')

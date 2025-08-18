@@ -76,6 +76,7 @@ export default function Requests() {
             }
   
             return {
+              ...req,
               id: req._id,
               name: req.user_name || 'Unknown User',
               phone: req.user_phone || 'N/A',
@@ -98,6 +99,33 @@ export default function Requests() {
     return () => clearInterval(interval);
   }, [mechanicId]);
   
+
+  // Accept request handler
+const handleAcceptRequest = async (requestId) => {
+  Alert.alert(
+    'Accept Request',
+    'Do you want to accept this request?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Accept',
+        onPress: async () => {
+          try {
+            await axios.post('http://10.0.2.2:8000/api/accept-request/', {
+              request_id: requestId,
+              mech_id: mechanicId
+            });
+            // Remove accepted request from list
+            setPendingRequests(prev => prev.filter(r => r.id !== requestId));
+          } catch (err) {
+            console.error("Accept failed:", err?.response?.data || err.message);
+          }
+        },
+      },
+    ]
+  );
+};
+
 
   // Reject request handler
   const handleRejectRequest = async (requestId) => {
@@ -125,15 +153,9 @@ export default function Requests() {
     );
   };
   
-  
-
-  const handleCall = (phoneNumber) => {
-    Alert.alert('Call', `Calling ${phoneNumber}`);
-  };
-
   const handleDetail = (request) => {
-    Alert.alert('Request Details', `Showing details for ${request.name}`);
-  };
+    navigation.navigate('UserDetail', { request });
+  }
 
   return (
     <View style={styles.container}>
@@ -185,8 +207,11 @@ export default function Requests() {
             {/* Actions */}
             <View style={styles.bottomRow}>
               <View style={styles.buttonGroup}>
-                <TouchableOpacity style={styles.callButton} onPress={() => handleCall(request.phone)}>
-                  <Text style={styles.callButtonText}>Call</Text>
+              <TouchableOpacity 
+                  style={styles.acceptButton} 
+                  onPress={() => handleAcceptRequest(request.id)}
+                >
+                  <Text style={styles.acceptButtonText}>Accept</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.detailButton} onPress={() => handleDetail(request)}>
                   <Text style={styles.detailButtonText}>Detail</Text>
@@ -401,20 +426,21 @@ const styles = StyleSheet.create({
     gap: 8,
     width: '100%',
   },
-  callButton: {
-    backgroundColor: '#10B981',
+  acceptButton: {
+    backgroundColor: '#10B981',   // green
     borderRadius: 6,
     paddingVertical: 8,
     paddingHorizontal: 12,
     flex: 1,
     alignItems: 'center',
   },
-  callButtonText: {
+  acceptButtonText: {
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '600',
     fontFamily: 'Poppins-SemiBold',
   },
+  
   detailButton: {
     backgroundColor: '#3B82F6',
     borderRadius: 6,
