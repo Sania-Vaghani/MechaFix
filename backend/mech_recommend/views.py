@@ -34,7 +34,7 @@ def get_mechanics(request):
             breakdown_type = data.get("breakdown_type", "engine")
             offset = int(data.get("offset", 0))
             limit = int(data.get("limit", 5))
-
+            
             if lat is None or lon is None:
                 return JsonResponse({'status': 'error', 'message': 'Latitude and longitude are required'}, status=400)
 
@@ -53,7 +53,7 @@ def get_mechanics(request):
             mechanic_list = mechanics_df.to_dict(orient='records')
 
             return JsonResponse({'status': 'success', 'mechanics': mechanic_list})
-
+            
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e), 'details': traceback.format_exc()}, status=500)
 
@@ -256,7 +256,8 @@ def get_pending_requests(request):
                     "breakdown_type": 1, "mechanics_list": 1, "created_at": 1,
                     "car_model": 1, "year": 1, "license_plate": 1,
                     "description": 1, "issue_type": 1, "image_url": 1,
-                    "direct_request": 1, "status": 1
+                    "direct_request": 1, "status": 1,
+                    "lat": 1, "lon": 1,  # Add lat and lon here
                 }
             ))
 
@@ -374,6 +375,41 @@ def get_service_request_detail(request, request_id):
                     m["mech_id"] = str(m["mech_id"])
 
             return JsonResponse({"status": "success", "request": req}, safe=False)
+
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+    return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
+
+# Add this new endpoint
+@csrf_exempt
+def assign_worker(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            request_id = data.get("request_id")
+            worker_id = data.get("worker_id")
+            worker_name = data.get("worker_name")
+            worker_phone = data.get("worker_phone")
+
+            if not all([request_id, worker_id, worker_name]):
+                return JsonResponse({"status": "error", "message": "Missing required fields"}, status=400)
+
+            # Update the service request with worker assignment
+            db.service_requests.update_one(
+                {"_id": ObjectId(request_id)},
+                {
+                    "$set": {
+                        "status": "assigned",
+                        "assigned_worker_id": worker_id,
+                        "assigned_worker_name": worker_name,
+                        "assigned_worker_phone": worker_phone,
+                        "assigned_at": datetime.utcnow()
+                    }
+                }
+            )
+
+            return JsonResponse({"status": "success", "message": "Worker assigned successfully"})
 
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=500)

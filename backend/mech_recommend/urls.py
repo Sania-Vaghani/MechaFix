@@ -8,4 +8,5 @@ urlpatterns = [
     path('api/pending-requests/', views.get_pending_requests, name='get_pending_requests'),
     path('api/mechanic-reject/', views.mechanic_reject_request, name='mechanic_reject_request'),  
     path('api/request-detail/<str:request_id>/', views.get_service_request_detail, name='get_service_request_detail'),
+    path('assign-worker/', views.assign_worker, name='assign_worker'),
 ]

@@ -36,6 +36,7 @@ import ForgotPasswordScreen from './src/components/ForgotPasswordscreen';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import LogoutScreen from './src/components/LogoutScreen';
 import UserDetail from './src/components/UserDetail';
+import WorkerPage from './src/components/WorkerPage';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -123,6 +124,7 @@ export default function App() {
             <Stack.Screen name="FullMap" component={FullMapScreen} />
             <Stack.Screen name="FoundMechanic" component={FoundMechanic} />
             <Stack.Screen name="UserDetail" component={UserDetail} />
+            <Stack.Screen name="WorkerPage" component={WorkerPage} />
           </Stack.Navigator>
         </NavigationContainer>
       </UserTypeProvider>

@@ -8,18 +8,31 @@ import backArrowIcon from '../images/arrow.png';
 import locIcon from '../images/loc.png';
 import carIcon from '../images/car.png';
 import axios from "axios";
+import WorkerAssignmentModal from './WorkerAssignmentModal';
 
 export default function UserDetail() {
   const [fullRequest, setFullRequest] = useState(null);
+  const [showWorkerModal, setShowWorkerModal] = useState(false);
+  const [assignedWorker, setAssignedWorker] = useState(null);
   const navigation = useNavigation();
   const route = useRoute();
   const { request } = route.params || {};
+
+  // Ensure request exists and has required properties
+  if (!request) {
+    return (
+      <View style={styles.centered}>
+        <CustomText style={styles.errorText}>No request details found.</CustomText>
+      </View>
+    );
+  }
 
   const location = request.location || {
     address: 'MG Road, Bangalore',
     distance: request.distance || '2.3 km',
     eta: request.eta || '15 mins',
   };
+  
   const car = {
     model: request.car_model || 'Unknown',
     plate: request.license_plate || 'N/A',
@@ -30,16 +43,18 @@ export default function UserDetail() {
   const [address, setAddress] = useState('Fetching address...');
   const [isLoading, setIsLoading] = useState(true);
 
-  const lat = request.latitude || 22.991227;
-  const lon = request.longitude || 72.488415;
+  // Ensure lat/lon are numbers
+  const lat = parseFloat(request.latitude) || 22.991227;
+  const lon = parseFloat(request.longitude) || 72.488415;
 
   useEffect(() => {
     const fetchDetail = async () => {
       try {
-        const res = await axios.get(`http://10.0.2.2:8000/api/request-detail/${request.id}/`);
-        if (res.data.status === "success") {
-            setFullRequest(res.data.request);
-
+        if (request.id) {
+          const res = await axios.get(`http://10.0.2.2:8000/api/request-detail/${request.id}/`);
+          if (res.data.status === "success") {
+              setFullRequest(res.data.request);
+          }
         }
       } catch (err) {
         console.error("❌ Error fetching request detail:", err);
@@ -69,17 +84,23 @@ export default function UserDetail() {
     })();
   }, [lat, lon]);
 
-  if (!request) {
-    return (
-      <View style={styles.centered}>
-        <CustomText style={styles.errorText}>No request details found.</CustomText>
-      </View>
-    );
-  }
-
   const handleAccept = () => {
-    Alert.alert("Accept", "You accepted the request ✅");
-    // TODO: Call backend API for accept
+    // Show worker assignment modal instead of direct accept
+    setShowWorkerModal(true);
+  };
+
+  const handleWorkerAssigned = (worker) => {
+    setAssignedWorker(worker);
+    Alert.alert(
+      "Request Accepted", 
+      `Request accepted and assigned to ${worker.name} ✅`,
+      [
+        {
+          text: "OK",
+          onPress: () => navigation.goBack()
+        }
+      ]
+    );
   };
 
   const handleReject = () => {
@@ -133,9 +154,12 @@ export default function UserDetail() {
               latitudeDelta: 0.01,
               longitudeDelta: 0.01,
             }}
-            showsUserLocation={true}
+            showsUserLocation={false} // Fixed: Changed from true to false to avoid boolean/object error
           >
-            <Marker coordinate={{ latitude: lat, longitude: lon }} title="Breakdown Location" />
+            <Marker 
+              coordinate={{ latitude: lat, longitude: lon }} 
+              title="Breakdown Location" 
+            />
           </MapView>
         </View>
       </View>
@@ -155,18 +179,31 @@ export default function UserDetail() {
         <View style={styles.carDescBox}>
           <CustomText style={styles.carDesc}>{fullRequest?.description || "No description provided"}</CustomText>
         </View>
-
       </View>
 
       {/* Accept / Reject Buttons */}
       <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept}>
-          <Text style={styles.btnText}>Accept</Text>
+        <TouchableOpacity 
+          style={[styles.acceptBtn, assignedWorker && styles.acceptBtnAssigned]} 
+          onPress={handleAccept}
+          disabled={!!assignedWorker} // Fixed: Ensure boolean value
+        >
+          <Text style={styles.btnText}>
+            {assignedWorker ? `Assigned to ${assignedWorker.name}` : 'Accept'}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.rejectBtn} onPress={handleReject}>
           <Text style={styles.btnText}>Reject</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Worker Assignment Modal */}
+      <WorkerAssignmentModal
+        visible={showWorkerModal}
+        onClose={() => setShowWorkerModal(false)}
+        requestId={request?.id}
+        onWorkerAssigned={handleWorkerAssigned}
+      />
     </View>
   );
 }
@@ -227,5 +264,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     fontFamily: 'Poppins-SemiBold',
+  },
+  acceptBtnAssigned: {
+    backgroundColor: '#059669', // Darker green for assigned state
   },
 });

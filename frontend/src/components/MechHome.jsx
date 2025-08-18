@@ -12,6 +12,7 @@ import hiIcon from '../images/hi.png';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from '../services/api';
+// import customerIcon from '../images/customer.png';
 
 
 export default function MechHome() {
@@ -92,6 +93,9 @@ export default function MechHome() {
           </View>
           <TouchableOpacity style={styles.headerIconBtn}>
             <Image source={settingIcon} style={styles.headerImgIcon} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.navigate('WorkerPage')}>
+            <Image source={user2Icon} style={styles.headerImgIcon} />
           </TouchableOpacity>
         </View>
       </LinearGradient>
