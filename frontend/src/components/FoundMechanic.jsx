@@ -18,22 +18,23 @@ const FoundMechanic = ({ route, navigation }) => {
   const [allLoaded, setAllLoaded] = useState(false);
 
   const loadUser = async () => {
-    let storedUser = await AsyncStorage.getItem("user");
-    if (!storedUser) {
-      const token = await AsyncStorage.getItem("jwtToken");
-      const userType = await AsyncStorage.getItem("userType");
-      if (token && userType === "user") {
-        const res = await fetch("http://10.0.2.2:8000/api/users/me/", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          storedUser = JSON.stringify(data);
-          await AsyncStorage.setItem("user", storedUser);
-        }
+    // Clear cached user data to ensure fresh data
+    await AsyncStorage.removeItem("user");
+    
+    const token = await AsyncStorage.getItem("jwtToken");
+    const userType = await AsyncStorage.getItem("userType");
+    if (token && userType === "user") {
+      const res = await fetch("http://10.0.2.2:8000/api/users/me/", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const storedUser = JSON.stringify(data);
+        await AsyncStorage.setItem("user", storedUser);
+        return data;
       }
     }
-    return storedUser ? JSON.parse(storedUser) : null;
+    return null;
   };
   
 
