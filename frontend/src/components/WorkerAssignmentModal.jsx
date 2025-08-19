@@ -73,8 +73,8 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
       
       console.log('🔧 Assigning worker:', worker.name, 'to request:', requestId);
       
-      // Fixed: Use the correct API endpoint without /api/ prefix
-      const response = await axios.post('http://10.0.2.2:8000/assign-worker/', {
+      // Fixed: Use the correct API endpoint with /api/ prefix
+      const response = await axios.post('http://10.0.2.2:8000/api/assign-worker/', {
         request_id: requestId,
         worker_id: worker.id,
         worker_name: worker.name,

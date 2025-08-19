@@ -415,3 +415,44 @@ def assign_worker(request):
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
     return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
+
+@csrf_exempt
+def get_assigned_requests(request):
+    if request.method == "GET":
+        try:
+            mech_id = request.GET.get("mech_id")
+            if not mech_id:
+                return JsonResponse({"status": "error", "message": "mech_id required"}, status=400)
+
+            q = {
+                "status": "assigned",
+                "assigned_worker_id": {"$exists": True}
+            }
+
+            docs = list(db.service_requests.find(q).sort("assigned_at", -1))
+
+            results = []
+            for d in docs:
+                d["_id"] = str(d["_id"])
+                if isinstance(d.get("user_id"), ObjectId):
+                    d["user_id"] = str(d["user_id"])
+                results.append({
+                    "id": d["_id"],
+                    "user_name": d.get("user_name", "Unknown User"),
+                    "user_phone": d.get("user_phone", "N/A"),
+                    "breakdown_type": d.get("breakdown_type", d.get("issue_type", "N/A")),
+                    "address": d.get("user_address") or d.get("address"),
+                    "car_model": d.get("car_model"),
+                    "license_plate": d.get("license_plate"),
+                    "assigned_worker_id": d.get("assigned_worker_id"),
+                    "assigned_worker_name": d.get("assigned_worker_name"),
+                    "assigned_worker_phone": d.get("assigned_worker_phone"),
+                    "assigned_at": d.get("assigned_at"),
+                    "lat": d.get("lat"),
+                    "lon": d.get("lon"),
+                })
+
+            return JsonResponse({"status": "success", "requests": results})
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+    return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
