@@ -101,29 +101,9 @@ export default function Requests() {
   
 
   // Accept request handler
-const handleAcceptRequest = async (requestId) => {
-  Alert.alert(
-    'Accept Request',
-    'Do you want to accept this request?',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Accept',
-        onPress: async () => {
-          try {
-            await axios.post('http://10.0.2.2:8000/api/accept-request/', {
-              request_id: requestId,
-              mech_id: mechanicId
-            });
-            // Remove accepted request from list
-            setPendingRequests(prev => prev.filter(r => r.id !== requestId));
-          } catch (err) {
-            console.error("Accept failed:", err?.response?.data || err.message);
-          }
-        },
-      },
-    ]
-  );
+const handleAcceptRequest = (request) => {
+  // Navigate to detail screen and auto-open the assignment modal
+  navigation.navigate('UserDetail', { request, autoOpenAssignment: true });
 };
 
 
@@ -209,7 +189,7 @@ const handleAcceptRequest = async (requestId) => {
               <View style={styles.buttonGroup}>
               <TouchableOpacity 
                   style={styles.acceptButton} 
-                  onPress={() => handleAcceptRequest(request.id)}
+                  onPress={() => handleAcceptRequest(request)}
                 >
                   <Text style={styles.acceptButtonText}>Accept</Text>
                 </TouchableOpacity>

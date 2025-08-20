@@ -202,15 +202,26 @@ def mechanic_accept_request(request):
             if not request_id or not mech_id:
                 return JsonResponse({"status": "error", "message": "Missing request_id or mech_id"}, status=400)
 
+            req = db.service_requests.find_one({"_id": ObjectId(request_id)})
+            if not req:
+                return JsonResponse({"status": "error", "message": "Request not found"}, status=404)
+
+            updated_list = []
+            for m in req.get("mechanics_list", []):
+                if str(m.get("mech_id")) == str(mech_id):
+                    m["status"] = "accepted"
+                else:
+                    if m.get("status") == "pending":
+                        m["status"] = "cancelled"
+                updated_list.append(m)
+
             db.service_requests.update_one(
-                {"_id": ObjectId(request_id), "mechanics_list.mech_id": str(mech_id)},
-                {
-                    "$set": {
-                        "mechanics_list.$.status": "accepted",
-                        "accepted_by": str(mech_id),
-                        "accepted_at": datetime.utcnow()
-                    }
-                }
+                {"_id": ObjectId(request_id)},
+                {"$set": {
+                    "mechanics_list": updated_list,
+                    "accepted_by": str(mech_id),
+                    "accepted_at": datetime.utcnow()
+                }}
             )
 
             db.auth_mech.update_one(
@@ -219,12 +230,9 @@ def mechanic_accept_request(request):
             )
 
             return JsonResponse({"status": "success"})
-
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
     return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
-
 
 # -----------------------------
 # API: Get pending requests
@@ -428,17 +436,15 @@ def assign_worker(request):
     try:
         data = json.loads(request.body)
         req_id = data.get("request_id")
-        worker_id = data.get("worker_id")   # ✅ changed from mech_id
+        worker_id = data.get("worker_id")
 
         if not req_id or not worker_id:
             return JsonResponse({"error": "request_id and worker_id are required"}, status=400)
 
-        # ✅ Find worker
         worker = db.mech_worker.find_one({"_id": ObjectId(worker_id)})
         if not worker:
             return JsonResponse({"error": "Worker not found"}, status=404)
 
-        # ✅ Find the garage of this worker (join with auth_mech)
         garage = db.auth_mech.find_one({"garage_name": worker.get("garage_name")})
         if not garage:
             return JsonResponse({"error": "Garage not found"}, status=404)
@@ -451,12 +457,26 @@ def assign_worker(request):
             "garage_coords": garage.get("coords", {}),
         }
 
-        # ✅ Save assigned_worker in service_requests
+        req = db.service_requests.find_one({"_id": ObjectId(req_id)})
+        if not req:
+            return JsonResponse({"error": "Service request not found"}, status=404)
+
+        updated_list = []
+        for m in req.get("mechanics_list", []):
+            if str(m.get("mech_id")) == str(garage.get("_id")):
+                m["status"] = "accepted"
+            else:
+                if m.get("status") == "pending":
+                    m["status"] = "cancelled"
+            updated_list.append(m)
+
         result = db.service_requests.update_one(
             {"_id": ObjectId(req_id)},
             {"$set": {
                 "assigned_worker": assigned_worker,
-                "worker_assigned_at": datetime.utcnow()
+                "worker_assigned_at": datetime.utcnow(),
+                "mechanics_list": updated_list,
+                "accepted_by": str(garage.get("_id"))
             }}
         )
 
@@ -464,6 +484,44 @@ def assign_worker(request):
             return JsonResponse({"error": "Service request not found"}, status=404)
 
         return JsonResponse({"status": "success", "assigned_worker": assigned_worker})
-
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+@csrf_exempt
+def get_assigned_requests(request):
+    if request.method == "GET":
+        try:
+            mech_id = request.GET.get("mech_id")
+            worker_id = request.GET.get("worker_id")
+
+            if not mech_id and not worker_id:
+                return JsonResponse({"status": "error", "message": "mech_id or worker_id required"}, status=400)
+
+            query = {}
+            if mech_id:
+                query["accepted_by"] = str(mech_id)
+            if worker_id:
+                query["assigned_worker.worker_id"] = str(worker_id)
+
+            docs = list(db.service_requests.find(query).sort("worker_assigned_at", -1))
+            out = []
+            for d in docs:
+                out.append({
+                    "id": str(d["_id"]),
+                    "user_id": str(d.get("user_id")) if d.get("user_id") else None,
+                    "user_name": d.get("user_name"),
+                    "user_phone": d.get("user_phone"),
+                    "breakdown_type": d.get("breakdown_type"),
+                    "lat": d.get("lat"),
+                    "lon": d.get("lon"),
+                    "address": d.get("address"),
+                    "car_model": d.get("car_model"),
+                    "license_plate": d.get("license_plate"),
+                    "description": d.get("description"),
+                    "issue_type": d.get("issue_type"),
+                    "assigned_worker": d.get("assigned_worker", {}),
+                })
+            return JsonResponse({"status": "success", "requests": out})
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+    return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)

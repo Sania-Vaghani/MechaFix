@@ -32,7 +32,7 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
       if (response.data.workers && Array.isArray(response.data.workers)) {
         // Transform the workers data to include status and rating
         const transformedWorkers = response.data.workers.map(worker => ({
-          id: worker._id,
+          id: worker.id || worker._id,
           name: worker.name,
           phone: worker.phone,
           status: 'available', // Default status since API doesn't provide it
@@ -61,12 +61,21 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
     }
   };
 
+  const isValidObjectId = (value) => {
+    return typeof value === 'string' && /^[a-fA-F0-9]{24}$/.test(value);
+  };
+
   const handleAssign = async (worker) => {
     try {
       setAssigning(true); // ✅ instead of setLoading
+      const workerId = String(worker.id || worker._id);
+      if (!requestId || !workerId || !isValidObjectId(workerId)) {
+        Alert.alert('Error', 'Invalid request or worker id');
+        return;
+      }
       const res = await axios.post("http://10.0.2.2:8000/api/assign-worker/", {
-        request_id: requestId,
-        worker_id: worker.id,
+        request_id: String(requestId),
+        worker_id: workerId,
       });
       
   
@@ -77,8 +86,9 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
         Alert.alert("Error", res.data.error || "Failed to assign worker");
       }
     } catch (err) {
-      console.error("❌ Error assigning worker:", err);
-      Alert.alert("Error", "Could not assign worker");
+      console.error("❌ Error assigning worker:", err?.response?.data || err.message);
+      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Could not assign worker';
+      Alert.alert("Error", msg);
     } finally {
       setAssigning(false); // ✅ reset properly
     }
@@ -124,8 +134,8 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
                 <Text style={styles.emptySubtext}>Add workers to your team to assign them to requests</Text>
               </View>
             ) : (
-              workers.map((worker) => (
-                <View key={worker.id} style={styles.workerCard}>
+              workers.map((worker, index) => (
+                <View key={`${worker.id || worker._id || worker.phone || 'w'}-${index}`} style={styles.workerCard}>
                   <View style={styles.workerInfo}>
                     <View style={styles.workerHeader}>
                       <Text style={styles.workerName}>{worker.name}</Text>
@@ -143,16 +153,16 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
                   <TouchableOpacity
   style={[
     styles.assignButton,
-    worker.status === 'busy' && styles.assignButtonDisabled
+    (worker.status === 'busy' || !isValidObjectId(worker.id || worker._id)) && styles.assignButtonDisabled
   ]}
   onPress={() => handleAssign(worker)}   // ✅ fixed function name
-  disabled={worker.status === 'busy' || assigning}
+  disabled={worker.status === 'busy' || assigning || !isValidObjectId(worker.id || worker._id)}
 >
   {assigning ? (
     <ActivityIndicator size="small" color="#FFFFFF" />
   ) : (
     <Text style={styles.assignButtonText}>
-      {worker.status === 'busy' ? 'Busy' : 'Assign'}
+      {worker.status === 'busy' ? 'Busy' : !isValidObjectId(worker.id || worker._id) ? 'Invalid ID' : 'Assign'}
     </Text>
   )}
 </TouchableOpacity>
@@ -169,7 +179,11 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',

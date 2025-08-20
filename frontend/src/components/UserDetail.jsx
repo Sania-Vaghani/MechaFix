@@ -17,6 +17,13 @@ export default function UserDetail() {
   const navigation = useNavigation();
   const route = useRoute();
   const { request } = route.params || {};
+  
+  // Auto-open assignment modal if requested by previous screen
+  useEffect(() => {
+    if (route?.params?.autoOpenAssignment) {
+      setShowWorkerModal(true);
+    }
+  }, [route?.params?.autoOpenAssignment]);
 
   // Ensure request exists and has required properties
   if (!request) {
@@ -201,7 +208,7 @@ export default function UserDetail() {
       <WorkerAssignmentModal
         visible={showWorkerModal}
         onClose={() => setShowWorkerModal(false)}
-        requestId={request?.id}
+        requestId={fullRequest?._id || request?.id || request?._id}
         onWorkerAssigned={handleWorkerAssigned}
       />
     </View>

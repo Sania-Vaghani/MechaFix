@@ -86,6 +86,7 @@ def workers(request):
     try:
         coll.create_index('phone', unique=True)
         coll.create_index('garage_name')
+        coll.create_index('garage_id')
     except Exception:
         pass
 
@@ -112,6 +113,7 @@ def workers(request):
 
             doc = {
                 'garage_name': garage_name,
+                'garage_id': str(mech.get('_id')),
                 'name': name,
                 'phone': phone,
                 'created_at': __import__('datetime').datetime.utcnow(),
