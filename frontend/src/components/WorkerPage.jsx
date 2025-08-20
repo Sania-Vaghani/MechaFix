@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, TextInput, ScrollView, Linking } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import MapView, { Marker } from 'react-native-maps';
 import { useNavigation } from '@react-navigation/native';
 import backArrowIcon from '../images/arrow.png';
 import user2Icon from '../images/user2.png';
 import phoneIcon from '../images/phone.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import MapView, { Marker } from 'react-native-maps';
 
 export default function WorkerPage() {
   const navigation = useNavigation();
@@ -37,20 +37,39 @@ export default function WorkerPage() {
     const fetchAssignment = async () => {
       if (!mechanicId) return;
       try {
-        const url = `http://10.0.2.2:8000/api/pending-requests/?mech_id=${mechanicId}`;
-        const res = await axios.get(url);
+        // 1) Try assigned requests first
+        let url = `http://10.0.2.2:8000/api/assigned-requests/?mech_id=${mechanicId}`;
+        let res = await axios.get(url);
         if (res.data?.status === 'success' && res.data.requests?.length) {
-          // pick the first request as current assignment
+          const r = res.data.requests[0];
+          setAssignment({
+            id: r.id,
+            name: r.user_name || 'Unknown User',
+            phone: r.user_phone || 'N/A',
+            issue: r.breakdown_type || 'N/A',
+            address: r.address || '',
+            car: `${r.car_model || ''} (${r.license_plate || '-'})`,
+            status: 'assigned',
+            lat: typeof r.lat === 'number' ? r.lat : parseFloat(r.lat),
+            lon: typeof r.lon === 'number' ? r.lon : parseFloat(r.lon),
+          });
+          return;
+        }
+        // 2) Fallback: first pending request
+        url = `http://10.0.2.2:8000/api/pending-requests/?mech_id=${mechanicId}`;
+        res = await axios.get(url);
+        if (res.data?.status === 'success' && res.data.requests?.length) {
           const r = res.data.requests[0];
           setAssignment({
             id: r._id,
             name: r.user_name || 'Unknown User',
             phone: r.user_phone || 'N/A',
-            issue: r.breakdown_type || 'N/A',
+            issue: r.breakdown_type || r.issue_type || 'N/A',
             address: r.user_address || r.address || '',
-            carModel: r.car_model || 'N/A',
-            carNumber: r.license_plate || 'N/A', // Use license_plate from DB
-            location: r.lat && r.lon ? { latitude: r.lat, longitude: r.lon } : null, // Use lat/lon from DB
+            car: `${r.car_model || ''} (${r.license_plate || '-'})`,
+            status: r.status || 'pending',
+            lat: typeof r.lat === 'number' ? r.lat : parseFloat(r.lat),
+            lon: typeof r.lon === 'number' ? r.lon : parseFloat(r.lon),
           });
         }
       } catch (e) {
@@ -75,14 +94,15 @@ export default function WorkerPage() {
       Alert.alert('OTP', 'Please enter the 4-digit OTP.');
       return;
     }
-    // Hook for backend OTP verification if/when available.
     Alert.alert('OTP', `Submitted OTP: ${code}`);
   };
+
+  const hasCoords = assignment && typeof assignment?.lat === 'number' && typeof assignment?.lon === 'number' && !Number.isNaN(assignment.lat) && !Number.isNaN(assignment.lon);
 
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#FF4D4F', '#FF4D4F', '#FF4D4F']}
+        colors={['#f7cac9', '#f3e7e9', '#a1c4fd']}
         style={styles.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -101,7 +121,8 @@ export default function WorkerPage() {
             <View style={{ flex: 1 }}>
               <Text style={styles.nameText}>{assignment?.name || 'No current assignment'}</Text>
               <Text style={styles.issueText}>Issue: {assignment?.issue || '-'}</Text>
-              <Text style={styles.detailText}>Car: {assignment?.carModel || '-'} ({assignment?.carNumber || '-'})</Text>
+              <Text style={styles.issueText}>Car: {assignment?.car || '- (-)'}</Text>
+              <Text style={styles.issueText}>Status: {assignment?.status || '-'}</Text>
               {!!assignment?.address && <Text style={styles.addrText} numberOfLines={2}>{assignment.address}</Text>}
             </View>
             {!!assignment?.phone && (
@@ -119,27 +140,27 @@ export default function WorkerPage() {
               </TouchableOpacity>
             )}
           </View>
-        </View>
 
-        {assignment?.location?.latitude && assignment?.location?.longitude && (
-          <View style={styles.mapCard}>
-            <MapView
-              style={styles.map}
-              initialRegion={{
-                latitude: assignment.location.latitude,
-                longitude: assignment.location.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              }}
-            >
-              <Marker
-                coordinate={assignment.location}
-                title={assignment.name}
-                description={assignment.address}
-              />
-            </MapView>
-          </View>
-        )}
+          {hasCoords && (
+            <View style={styles.mapCard}>
+              <MapView
+                style={styles.map}
+                initialRegion={{
+                  latitude: assignment.lat,
+                  longitude: assignment.lon,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }}
+              >
+                <Marker
+                  coordinate={{ latitude: assignment.lat, longitude: assignment.lon }}
+                  title={assignment.name}
+                  description={assignment.address}
+                />
+              </MapView>
+            </View>
+          )}
+        </View>
 
         <View style={styles.otpCard}>
           <Text style={styles.otpTitle}>OTP Verification</Text>
@@ -197,7 +218,6 @@ const styles = StyleSheet.create({
   userAvatar: { width: 56, height: 56, borderRadius: 28, marginRight: 12, backgroundColor: '#f3f4ff' },
   nameText: { fontSize: 18, fontWeight: 'bold', color: '#22223B', marginBottom: 2 },
   issueText: { fontSize: 14, color: '#444' },
-  detailText: { fontSize: 14, color: '#444', marginTop: 4 },
   addrText: { fontSize: 13, color: '#666', marginTop: 4 },
   callBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffefef', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, marginLeft: 10 },
   callIcon: { width: 16, height: 16, tintColor: '#FF4D4F', marginRight: 6 },
@@ -206,21 +226,18 @@ const styles = StyleSheet.create({
   mapCard: {
     borderRadius: 18,
     overflow: 'hidden',
-    marginTop: 16,
+    marginTop: 12,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
   },
-  map: {
-    height: 200,
-  },
+  map: { height: 200 },
 
   otpCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
-    padding: 19,
-    marginTop: 16, // Add margin to prevent overlap
+    padding: 18,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 12,

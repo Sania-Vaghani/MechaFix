@@ -85,19 +85,19 @@ function MainTabNavigator() {
   
   if (userType === 'mechanic') {
     console.log('✅ [MainTabNavigator] Rendering MECHANIC tabs');
-    return (
-      <Tab.Navigator
-        screenOptions={{ headerShown: false }}
-        tabBar={props => <MechTabBar {...props} />}
-      >
-        <Tab.Screen name="Home" component={MechHome} />
-        <Tab.Screen name="Availability" component={Availability} />
-        <Tab.Screen name="Services" component={Services} />
-        <Tab.Screen name="Requests" component={Requests} />
-        <Tab.Screen name="Profile" component={MechProfile} />
-      </Tab.Navigator>
-    );
-  }
+  return (
+    <Tab.Navigator
+      screenOptions={{ headerShown: false }}
+      tabBar={props => <MechTabBar {...props} />}
+    >
+      <Tab.Screen name="Home" component={MechHome} />
+      <Tab.Screen name="Availability" component={Availability} />
+      <Tab.Screen name="Services" component={Services} />
+      <Tab.Screen name="Requests" component={Requests} />
+      <Tab.Screen name="Profile" component={MechProfile} />
+    </Tab.Navigator>
+  );
+}
 
   console.log('❌ [MainTabNavigator] Unknown userType:', userType);
   return <LoadingScreen />;
@@ -108,22 +108,22 @@ export default function App() {
   
   return (
     <ErrorBoundary>
-      <UserTypeProvider>
-        <NavigationContainer>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Splash" component={SplashScreen} />
-            <Stack.Screen name="UserTypeSelection" component={UserTypeSelection} />
-            <Stack.Screen name="Login" component={Login} />
-            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+    <UserTypeProvider>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Splash" component={SplashScreen} />
+          <Stack.Screen name="UserTypeSelection" component={UserTypeSelection} />
+          <Stack.Screen name="Login" component={Login} />
+          <Stack.Screen name="MainTabs" component={MainTabNavigator} />
             <Stack.Screen name="Logout" component={LogoutScreen} />
-            <Stack.Screen name="SignUp" component={SignUp} />
-            <Stack.Screen name="Otp" component={OtpScreen} />
-            <Stack.Screen name="PhoneNum" component={PhoneNum} />
-            <Stack.Screen name="CreatePassword" component={CreatePassword} />
-            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-            <Stack.Screen name="ForgotPasswordOtp" component={ForgotPasswordOtpScreen} />
-            <Stack.Screen name="FullMap" component={FullMapScreen} />
-            <Stack.Screen name="FoundMechanic" component={FoundMechanic} />
+          <Stack.Screen name="SignUp" component={SignUp} />
+          <Stack.Screen name="Otp" component={OtpScreen} />
+          <Stack.Screen name="PhoneNum" component={PhoneNum} />
+          <Stack.Screen name="CreatePassword" component={CreatePassword} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="ForgotPasswordOtp" component={ForgotPasswordOtpScreen} />
+          <Stack.Screen name="FullMap" component={FullMapScreen} />
+          <Stack.Screen name="FoundMechanic" component={FoundMechanic} />
             <Stack.Screen name="UserDetail" component={UserDetail} />
             <Stack.Screen name="WorkerPage" component={WorkerPage} />
             {/* <Stack.Screen name="AssignedMech" component={AssignedMech} /> */}
