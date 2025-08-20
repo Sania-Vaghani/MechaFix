@@ -73,8 +73,8 @@ df['sentiment_score'] = df['comment'].apply(sentiment_analyzer.score)
 # ---------------------------
 # OpenRouteService Setup
 # ---------------------------
-ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjJkOTIxMDYwMDQ0ODQwMjRhMjFjYjc4ZDRiZjI1ODcxIiwiaCI6Im11cm11cjY0In0="  # Replace with your real key
-ors_client = openrouteservice.Client(key=ORS_API_KEY)
+ORS_API_KEY_model = os.getenv('ORS_API_KEY_model')
+ors_client = openrouteservice.Client(key=ORS_API_KEY_model)
 
 def get_road_distance(user_lat, user_long, mech_lat, mech_long):
     try:

@@ -18,22 +18,33 @@ const FoundMechanic = ({ route, navigation }) => {
   const [allLoaded, setAllLoaded] = useState(false);
 
   const loadUser = async () => {
-    let storedUser = await AsyncStorage.getItem("user");
-    if (!storedUser) {
+    try {
+      // Always fetch fresh user data from the server to ensure it's up-to-date
       const token = await AsyncStorage.getItem("jwtToken");
       const userType = await AsyncStorage.getItem("userType");
+
       if (token && userType === "user") {
         const res = await fetch("http://10.0.2.2:8000/api/users/me/", {
           headers: { Authorization: `Bearer ${token}` },
         });
+
         if (res.ok) {
           const data = await res.json();
-          storedUser = JSON.stringify(data);
-          await AsyncStorage.setItem("user", storedUser);
+          // Update the cache with the fresh data
+          await AsyncStorage.setItem("user", JSON.stringify(data));
+          return data; // Return the fresh data
+        } else {
+          // If fetching fails, fall back to cached data as a last resort
+          console.log("Failed to fetch user data, trying cache...");
+          const storedUser = await AsyncStorage.getItem("user");
+          return storedUser ? JSON.parse(storedUser) : null;
         }
       }
+    } catch (error) {
+      console.error("Error in loadUser:", error);
     }
-    return storedUser ? JSON.parse(storedUser) : null;
+    // If all else fails, return null
+    return null;
   };
   
 

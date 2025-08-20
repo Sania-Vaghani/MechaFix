@@ -58,6 +58,10 @@ const UserSignUp = () => {
       const returnedUserType = response.data.user_type;
       await AsyncStorage.setItem('jwtToken', token);
       await AsyncStorage.setItem('userType', returnedUserType);
+
+    // Clear any cached user data to prevent stale data issues
+    await AsyncStorage.removeItem('user');
+
       alert('Login successful!');
       // After successful login and getting user type
       setUserType(returnedUserType); // Set user type in context
