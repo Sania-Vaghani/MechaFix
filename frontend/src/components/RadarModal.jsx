@@ -194,7 +194,7 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
         if (onNoMechanicsFound) {
           onNoMechanicsFound(fetchedMechanics);
         }
-      }, 120000);
+      }, 10000);
 
       sweepAnim.setValue(0);
       sweepLoop = Animated.loop(

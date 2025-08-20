@@ -14,6 +14,7 @@ import jwt
 from django.conf import settings
 from django.db import connection
 import os
+from bson import ObjectId
 from twilio.rest import Client
 import urllib.parse
 from twilio.base.exceptions import TwilioRestException
@@ -578,3 +579,22 @@ def send_sos_whatsapp(request):
             'click_to_chat': click,
             'error': str(e)
         })
+
+@csrf_exempt
+def get_mechanic(request, mech_id):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'GET required'}, status=405)
+
+    db = connection.cursor().db_conn
+    try:
+        mech = db['auth_mech'].find_one({'_id': ObjectId(mech_id)})
+        if not mech:
+            return JsonResponse({'error': 'Mechanic not found'}, status=404)
+
+        # Clean up sensitive fields
+        mech['_id'] = str(mech['_id'])
+        mech.pop('password', None)
+
+        return JsonResponse(mech, safe=False)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)

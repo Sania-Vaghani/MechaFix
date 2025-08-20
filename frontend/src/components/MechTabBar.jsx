@@ -9,7 +9,7 @@ import requestsIcon from '../images/chat.png';
 const icons = [
   { name: 'Home', icon: homeIcon },
   { name: 'Availability', icon: availabilityIcon },
-  { name: 'Services', icon: servicesIcon },
+  { name: 'Team', icon: servicesIcon },
   { name: 'Requests', icon: requestsIcon, badge: true },
   { name: 'Profile', icon: profileIcon },
 ];
@@ -19,7 +19,7 @@ const INACTIVE = '#B0B0B0';
 
 const MechTabBar = ({ state, descriptors, navigation }) => {
   // This will be updated when requests change
-  const [requestCount, setRequestCount] = useState(6); // Initial count
+  const [requestCount, setRequestCount] = useState(1); // Initial count
 
   // Listen for navigation events to update count
   useEffect(() => {

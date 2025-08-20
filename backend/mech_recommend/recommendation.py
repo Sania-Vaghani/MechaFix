@@ -16,7 +16,7 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 warnings.filterwarnings("ignore")
 
 # ---------------------------
-# 🚗 Haversine Distance Function
+# Haversine Distance Function
 # ---------------------------
 def haversine_distance(lat1, lon1, lat2, lon2):
     lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
@@ -28,7 +28,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return c * r
 
 # ---------------------------
-# 💬 Sentiment Analyzer
+# Sentiment Analyzer
 # ---------------------------
 class SentimentAnalyzer:
     def __init__(self):
@@ -44,7 +44,7 @@ class SentimentAnalyzer:
         return probs[2] - probs[0]  # pos - neg
 
 # ---------------------------
-# 📄 Load & Preprocess Data
+# Load & Preprocess Data
 # ---------------------------
 
 # MongoDB connection (use your actual connection string)
@@ -71,7 +71,7 @@ sentiment_analyzer = SentimentAnalyzer()
 df['sentiment_score'] = df['comment'].apply(sentiment_analyzer.score)
 
 # ---------------------------
-# 📍 OpenRouteService Setup
+# OpenRouteService Setup
 # ---------------------------
 ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjJkOTIxMDYwMDQ0ODQwMjRhMjFjYjc4ZDRiZjI1ODcxIiwiaCI6Im11cm11cjY0In0="  # Replace with your real key
 ors_client = openrouteservice.Client(key=ORS_API_KEY)
@@ -85,45 +85,8 @@ def get_road_distance(user_lat, user_long, mech_lat, mech_long):
         return haversine_distance(user_lat, user_long, mech_lat, mech_long)
 
 # ---------------------------
-# 🔍 Recommendation Function
+# Recommendation Function
 # ---------------------------
-# def recommend_mechanics(user_lat, user_long, breakdown_type, top_k=5):
-#     filtered = df[df['breakdown_type'].str.lower() == breakdown_type.lower()].copy()
-
-#     if filtered.empty:
-#         print(f"No exact match for breakdown_type '{breakdown_type}', using all data.")
-#         filtered = df.copy()
-
-#     # Haversine distance for all mechanics
-#     filtered['distance_km'] = filtered.apply(
-#         lambda row: haversine_distance(user_lat, user_long, row['mech_lat'], row['mech_long']), axis=1
-#     )
-
-#     # Normalize features
-#     filtered['norm_rating'] = (filtered['rating'] - filtered['rating'].min()) / (filtered['rating'].max() - filtered['rating'].min())
-#     filtered['norm_sentiment'] = (filtered['sentiment_score'] - filtered['sentiment_score'].min()) / (filtered['sentiment_score'].max() - filtered['sentiment_score'].min())
-#     filtered['inv_distance'] = 1 / (filtered['distance_km'] + 1)
-#     filtered['norm_inv_distance'] = (filtered['inv_distance'] - filtered['inv_distance'].min()) / (filtered['inv_distance'].max() - filtered['inv_distance'].min())
-
-#     # Score
-#     filtered['score'] = (
-#         0.5 * filtered['norm_inv_distance'] +
-#         0.3 * filtered['norm_rating'] +
-#         0.2 * filtered['norm_sentiment']
-#     )
-
-#     # Sort and deduplicate
-#     filtered = filtered.sort_values(by='score', ascending=False)
-#     top_mechanics = filtered.drop_duplicates(subset='mech_name', keep='first').head(top_k)
-
-#     # Replace distance with road distance (fallback: haversine)
-#     top_mechanics['road_distance_km'] = top_mechanics.apply(
-#         lambda row: get_road_distance(user_lat, user_long, row['mech_lat'], row['mech_long']),
-#         axis=1
-#     )
-
-#     return top_mechanics[['mech_name', 'mech_lat', 'mech_long', 'rating', 'comment',
-#                           'breakdown_type', 'distance_km', 'road_distance_km', 'score']]
 
 def recommend_mechanics(user_lat, user_long, breakdown_type):
     filtered = df[df['breakdown_type'].str.lower() == breakdown_type.lower()].copy()
@@ -152,7 +115,7 @@ def recommend_mechanics(user_lat, user_long, breakdown_type):
     return filtered
 
 # ---------------------------
-# 📌 Example Usage
+# Example Usage
 # ---------------------------
 # def get_top_mechanics(user_lat, user_long, breakdown_type):
 #     return recommend_mechanics(user_lat, user_long, breakdown_type)

@@ -32,7 +32,7 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
       if (response.data.workers && Array.isArray(response.data.workers)) {
         // Transform the workers data to include status and rating
         const transformedWorkers = response.data.workers.map(worker => ({
-          id: worker.id,
+          id: worker._id,
           name: worker.name,
           phone: worker.phone,
           status: 'available', // Default status since API doesn't provide it
@@ -61,67 +61,30 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
     }
   };
 
-  const handleAssignWorker = async (worker) => {
-    if (worker.status === 'busy') {
-      Alert.alert('Worker Busy', 'This worker is currently busy with another task.');
-      return;
-    }
-
+  const handleAssign = async (worker) => {
     try {
-      setAssigning(true);
-      const token = await AsyncStorage.getItem('jwtToken');
-      
-      console.log('🔧 Assigning worker:', worker.name, 'to request:', requestId);
-      
-      // Fixed: Use the correct API endpoint without /api/ prefix
-      const response = await axios.post('http://10.0.2.2:8000/assign-worker/', {
+      setAssigning(true); // ✅ instead of setLoading
+      const res = await axios.post("http://10.0.2.2:8000/api/assign-worker/", {
         request_id: requestId,
         worker_id: worker.id,
-        worker_name: worker.name,
-        worker_phone: worker.phone
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
-
-      console.log('📡 Assign worker response:', response.data);
-
-      if (response.data.status === 'success') {
-        Alert.alert(
-          'Worker Assigned', 
-          `${worker.name} has been assigned to this request.`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                onWorkerAssigned(worker);
-                onClose();
-              }
-            }
-          ]
-        );
+      
+  
+      if (res.data.status === "success") {
+        onWorkerAssigned(worker); // ✅ notify parent
+        onClose();
       } else {
-        Alert.alert('Error', response.data.message || 'Failed to assign worker');
+        Alert.alert("Error", res.data.error || "Failed to assign worker");
       }
-    } catch (error) {
-      console.error('❌ Error assigning worker:', error.response?.data || error.message);
-      // For demo purposes, show success even if API fails
-      Alert.alert(
-        'Worker Assigned', 
-        `${worker.name} has been assigned to this request.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              onWorkerAssigned(worker);
-              onClose();
-            }
-          }
-        ]
-      );
+    } catch (err) {
+      console.error("❌ Error assigning worker:", err);
+      Alert.alert("Error", "Could not assign worker");
     } finally {
-      setAssigning(false);
+      setAssigning(false); // ✅ reset properly
     }
   };
+  
+  
 
   const getStatusColor = (status) => {
     return status === 'available' ? '#10B981' : '#EF4444';
@@ -178,21 +141,22 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
                   </View>
                   
                   <TouchableOpacity
-                    style={[
-                      styles.assignButton,
-                      worker.status === 'busy' && styles.assignButtonDisabled
-                    ]}
-                    onPress={() => handleAssignWorker(worker)}
-                    disabled={worker.status === 'busy' || assigning}
-                  >
-                    {assigning ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.assignButtonText}>
-                        {worker.status === 'busy' ? 'Busy' : 'Assign'}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+  style={[
+    styles.assignButton,
+    worker.status === 'busy' && styles.assignButtonDisabled
+  ]}
+  onPress={() => handleAssign(worker)}   // ✅ fixed function name
+  disabled={worker.status === 'busy' || assigning}
+>
+  {assigning ? (
+    <ActivityIndicator size="small" color="#FFFFFF" />
+  ) : (
+    <Text style={styles.assignButtonText}>
+      {worker.status === 'busy' ? 'Busy' : 'Assign'}
+    </Text>
+  )}
+</TouchableOpacity>
+
                 </View>
               ))
             )}
