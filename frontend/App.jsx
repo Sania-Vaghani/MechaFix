@@ -124,8 +124,8 @@ export default function App() {
           <Stack.Screen name="ForgotPasswordOtp" component={ForgotPasswordOtpScreen} />
           <Stack.Screen name="FullMap" component={FullMapScreen} />
           <Stack.Screen name="FoundMechanic" component={FoundMechanic} />
-            <Stack.Screen name="UserDetail" component={UserDetail} />
-            <Stack.Screen name="WorkerPage" component={WorkerPage} />
+            <Stack.Screen name="UserDetail" component={UserDetail} /> 
+            <Stack.Screen name="WorkerPage" component={WorkerPage} /> 
             {/* <Stack.Screen name="AssignedMech" component={AssignedMech} /> */}
           </Stack.Navigator>
         </NavigationContainer>
