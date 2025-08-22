@@ -309,7 +309,7 @@ export default function CustomerHistory() {
           <Image source={backArrowIcon} style={styles.backIcon} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Customer History</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.placeholder} />
       </LinearGradient>
 
       <ScrollView 
@@ -454,8 +454,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
     paddingTop: 50,
+    paddingBottom: 20,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
@@ -463,7 +465,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -471,15 +473,17 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     tintColor: '#fff',
+    resizeMode: 'contain',
   },
   headerTitle: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: '600',
-    marginLeft: 20,
-    flex: 1,
+    fontFamily: 'Cormorant-Bold',
     textAlign: 'center',
-    marginRight: 40,
+  },
+  placeholder: {
+    width: 40,
   },
   content: {
     padding: 16,

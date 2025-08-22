@@ -17,6 +17,7 @@ import accumulatorIcon from '../images/accumulator.png';
 import microphoneIcon from '../images/microphone.png';
 import boltIcon from '../images/bolt.png';
 import messageIcon from '../images/message.png';
+import refreshIcon from '../images/refresh.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from '../services/api';
 import LiveMap from './LiveMap';
@@ -89,6 +90,7 @@ const UserHome = ({
   const [searchFocused, setSearchFocused] = useState(false);
   // Change showResults logic to show dropdown and blur overlay on focus, even if search is empty
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [filteredMechanics, setFilteredMechanics] = useState([]);
 
   // Add a ref and state to measure the search bar position
   const searchBarRef = useRef(null);
@@ -178,12 +180,7 @@ const UserHome = ({
 
   // Rating modal close handler is now managed by RatingContext
 
-  // Filter mechanics
-  const filteredMechanics = mechanicData.filter(
-    m =>
-      m.name.toLowerCase().includes(search.toLowerCase()) ||
-      m.mobile.includes(search)
-  );
+  // Filter mechanics logic moved to onChangeText and onFocus handlers
 
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [noResultAnim] = useState(new Animated.Value(0));
@@ -669,6 +666,13 @@ const UserHome = ({
     }
   }, [user?._id]);
 
+  // Initialize filteredMechanics when recentMechanics changes
+  useEffect(() => {
+    if (recentMechanics.length > 0) {
+      setFilteredMechanics(recentMechanics);
+    }
+  }, [recentMechanics]);
+
   // Function to calculate distance between two coordinates
   const calculateDistance = (coord1, coord2) => {
     if (!coord1?.lat || !coord1?.lon || !coord2?.lat || !coord2?.lon) return 'N/A';
@@ -798,10 +802,27 @@ const UserHome = ({
             onChangeText={text => {
               setSearch(text);
               setShowResults(text.length > 0);
+              
+              if (text.length > 0) {
+                // Filter through recent mechanics
+                const filtered = recentMechanics.filter(mech => 
+                  mech.name.toLowerCase().includes(text.toLowerCase()) ||
+                  mech.garage_name?.toLowerCase().includes(text.toLowerCase()) ||
+                  mech.mobile.includes(text)
+                );
+                setFilteredMechanics(filtered);
+              } else {
+                // Show all recent mechanics when search is empty
+                setFilteredMechanics(recentMechanics);
+              }
             }}
             onFocus={() => {
               setDropdownOpen(true);
               setSearchFocused(true);
+              // Show recent mechanics when search is focused
+              if (recentMechanics.length > 0) {
+                setFilteredMechanics(recentMechanics);
+              }
             }}
             onBlur={() => setTimeout(() => {
               setDropdownOpen(false);
@@ -821,7 +842,7 @@ const UserHome = ({
           >
             {filteredMechanics.length > 0 || !search ? (
               <FlatList
-                data={filteredMechanics.length > 0 || search ? filteredMechanics : mechanicData}
+                data={filteredMechanics.length > 0 || search ? filteredMechanics : recentMechanics}
                 keyExtractor={item => item.id}
                 style={{ maxHeight: 220 }}
                 renderItem={({ item, index }) => (
@@ -839,7 +860,8 @@ const UserHome = ({
                     <Image source={require('../images/user.png')} style={styles.dropdownIcon} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.dropdownName}>{item.name}</Text>
-                      <Text style={styles.dropdownMobile}>{item.mobile}</Text>
+                      <Text style={styles.dropdownMobile}>{item.garage_name || item.mobile}</Text>
+                      <Text style={styles.dropdownAddress}>{item.mobile}</Text>
                     </View>
                     <TouchableOpacity 
                       style={styles.callIconBtn}
@@ -860,7 +882,9 @@ const UserHome = ({
             ) : (
               <Animated.View style={{ opacity: noResultAnim }}>
                 <View style={styles.dropdownRow}>
-                  <Text style={styles.noResultText}>No results found</Text>
+                  <Text style={styles.noResultText}>
+                    {recentMechanics.length === 0 ? 'No recent mechanics available' : 'No results found'}
+                  </Text>
                 </View>
               </Animated.View>
             )}
@@ -969,9 +993,10 @@ const UserHome = ({
               onPress={fetchRecentMechanics}
               disabled={isLoadingMechanics}
             >
-              <Text style={styles.sectionRefreshBtnText}>
-                {isLoadingMechanics ? '⟳' : '⟳'}
-              </Text>
+              <Image 
+                source={refreshIcon} 
+                style={[styles.sectionRefreshBtnIcon, isLoadingMechanics && styles.sectionRefreshBtnIconSpinning]}
+              />
             </TouchableOpacity>
           </View>
           <View style={styles.sectionDivider} />
@@ -982,7 +1007,7 @@ const UserHome = ({
                   inputRange: [0, 1],
                   outputRange: ['0deg', '360deg'],
                 })}] }]}>
-                  <Text style={styles.recentMechSpinnerText}>⟳</Text>
+                  <Image source={refreshIcon} style={styles.recentMechSpinnerIcon} />
                 </Animated.View>
                 <Text style={styles.recentMechLoadingText}>Loading mechanics...</Text>
               </View>
@@ -1103,9 +1128,6 @@ const UserHome = ({
             <View style={styles.floatingBoxLeft}>
               <View style={styles.floatingBoxIconContainer}>
                 <Image source={require('../images/engineer.png')} style={styles.floatingBoxIcon} />
-                <View style={styles.floatingBoxBadge}>
-                  <Text style={styles.floatingBoxBadgeText}>🔧</Text>
-                </View>
               </View>
               <View style={styles.floatingBoxTextContainer}>
                 <Text style={styles.floatingBoxTitle}>{assignedWorker.worker_name || 'Unknown'}</Text>
@@ -1137,12 +1159,7 @@ const UserHome = ({
               >
                 <Text style={styles.floatingBoxViewBtnText}>View</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.floatingBoxCloseBtn}
-                onPress={() => setAssignedWorker(null)}
-              >
-                <Text style={styles.floatingBoxCloseBtnText}>×</Text>
-              </TouchableOpacity>
+
             </View>
           </View>
         </Animated.View>
@@ -1166,7 +1183,7 @@ const UserHome = ({
             </View>
             <View style={styles.floatingBoxRight}>
               <View style={styles.floatingBoxLoadingSpinner}>
-                <Text style={styles.floatingBoxLoadingText}>⟳</Text>
+                <Image source={refreshIcon} style={styles.floatingBoxLoadingIcon} />
               </View>
             </View>
           </View>
@@ -1196,12 +1213,7 @@ const UserHome = ({
               >
                 <Text style={styles.floatingBoxRetryBtnText}>Retry</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.floatingBoxCloseBtn}
-                onPress={() => setWorkerError(null)}
-              >
-                <Text style={styles.floatingBoxCloseBtnText}>×</Text>
-              </TouchableOpacity>
+
             </View>
           </View>
         </Animated.View>
@@ -2286,11 +2298,11 @@ const styles = StyleSheet.create({
     borderTopColor: 'transparent',
     alignSelf: 'center',
   },
-  floatingBoxLoadingText: {
-    fontSize: 20,
-    color: '#6B7280',
-    fontWeight: 'bold',
-    marginTop: 5,
+  floatingBoxLoadingIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+    tintColor: '#6B7280',
   },
   floatingBoxStatusRow: {
     flexDirection: 'row',
@@ -2384,10 +2396,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sectionRefreshBtnText: {
-    fontSize: 20,
-    color: '#6B7280',
-    fontWeight: 'bold',
+  sectionRefreshBtnIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+  },
+  sectionRefreshBtnIconSpinning: {
+    opacity: 0.7,
   },
   recentMechSpinner: {
     width: 24,
@@ -2399,10 +2414,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  recentMechSpinnerText: {
-    color: '#2563EB',
-    fontSize: 14,
-    fontWeight: 'bold',
+  recentMechSpinnerIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+    tintColor: '#2563EB',
   },
   dropdownHistory: {
     fontSize: 12,

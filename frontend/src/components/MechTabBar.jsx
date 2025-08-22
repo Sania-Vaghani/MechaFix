@@ -33,6 +33,7 @@ const MechTabBar = ({ state, descriptors, navigation }) => {
 
   // Function to update request count (can be called from Requests component)
   const updateRequestCount = (count) => {
+    console.log('🔄 MechTabBar: Updating request count from', requestCount, 'to', count);
     setRequestCount(count);
   };
 

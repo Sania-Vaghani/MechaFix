@@ -270,11 +270,6 @@ export default function TrackingMap({ navigation, route }) {
           <Image source={backArrowIcon} style={styles.backIcon} />
         </TouchableOpacity>
         <CustomText style={styles.headerTitle}>Track Mechanic</CustomText>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={toggleMapType} style={styles.mapTypeButton}>
-            <Text style={styles.mapTypeIcon}>🗺️</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       {/* Map Container */}
@@ -439,10 +434,11 @@ const styles = StyleSheet.create({
     tintColor: '#fff',
   },
   headerTitle: {
+    fontSize: 28,
     color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
-    marginLeft: 20,
+    fontFamily: 'Cormorant-Bold',
+    textAlign: 'center',
+    flex: 1,
   },
   placeholder: {
     width: 40,

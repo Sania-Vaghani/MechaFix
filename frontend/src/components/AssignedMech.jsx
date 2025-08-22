@@ -181,7 +181,11 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 50, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
   backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   backIcon: { width: 18, height: 18, tintColor: '#fff' },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: '600', marginLeft: 20 },
+  headerTitle: { fontSize: 28,
+    color: '#fff',
+    fontFamily: 'Cormorant-Bold',
+    textAlign: 'center',
+    flex: 1, },
   placeholder: { width: 40 },
   content: { flex: 1, padding: 16 },
 

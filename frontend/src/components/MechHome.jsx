@@ -12,7 +12,13 @@ import hiIcon from '../images/hi.png';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from '../services/api';
+import axios from 'axios';
 // import customerIcon from '../images/customer.png';
+
+// Create separate API instance for mech_recommend endpoints (no /api/ prefix)
+const MechAPI = axios.create({
+  baseURL: 'http://10.0.2.2:8000/api/',
+});
 
 
 export default function MechHome() {
@@ -53,6 +59,15 @@ export default function MechHome() {
     };
     
     fetchData();
+    
+    // Set up auto-refresh every 30 seconds to keep data dynamic
+    const interval = setInterval(() => {
+      console.log('🔄 [MechHome] Auto-refreshing data...');
+      fetchOverviewData();
+      fetchRecentRequests();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   // Add token validation function
@@ -120,7 +135,7 @@ export default function MechHome() {
         // Primary: Try to get today's overview from dedicated endpoint
         try {
           console.log('🔍 [MechHome] Calling service-requests/today-overview/ with token:', token.substring(0, 20) + '...');
-          const overviewResponse = await API.get('service-requests/today-overview/', {
+          const overviewResponse = await MechAPI.get('service-requests/today-overview/', {
             headers: { Authorization: `Bearer ${token}` }
           });
 
@@ -136,7 +151,7 @@ export default function MechHome() {
 
         // Fallback: Fetch service requests and calculate stats
         try {
-          const requestsResponse = await API.get('service-requests/recent/', {
+          const requestsResponse = await MechAPI.get('service-requests/recent/', {
             headers: { Authorization: `Bearer ${token}` }
           });
 
@@ -186,7 +201,7 @@ export default function MechHome() {
           console.log('📊 [MechHome] Service requests endpoint failed:', requestsError);
         }
 
-        // Final fallback: Try to get data from user_history as before
+        // Fallback: Try to get data from user_history as before
         try {
           const profileResponse = await API.get(`users/mech/${mechanicId}/`, {
             headers: { Authorization: `Bearer ${token}` }
@@ -196,9 +211,21 @@ export default function MechHome() {
             const userHistory = profileResponse.data.user_history;
             console.log('📊 [MechHome] Final fallback: Found user_history in profile:', userHistory.length, 'items');
             
-            const total = userHistory.length;
-            const completed = userHistory.filter(req => req.status === 'completed').length;
-            const pending = userHistory.filter(req => req.status === 'pending').length;
+            // Filter for today's data only
+            const today = new Date();
+            const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+            
+            const todayHistory = userHistory.filter(item => {
+              const itemDate = new Date(item.recorded_at);
+              return itemDate >= todayStart && itemDate < todayEnd;
+            });
+            
+            console.log('📊 [MechHome] Today\'s history items:', todayHistory.length);
+            
+            const total = todayHistory.length;
+            const completed = todayHistory.filter(req => req.status === 'completed').length;
+            const pending = todayHistory.filter(req => req.status === 'pending').length;
             
             console.log('📊 [MechHome] Overview stats via final fallback:', { total, completed, pending });
             setOverviewData({ total, completed, pending });
@@ -209,20 +236,20 @@ export default function MechHome() {
         }
       }
 
-      console.log('📊 [MechHome] Using fallback mock data');
-      // Final fallback to mock data
+      console.log('📊 [MechHome] All API endpoints failed, showing empty data');
+      // Don't use mock data, show empty state
       setOverviewData({
-        total: 5,
-        pending: 2,
-        completed: 3
+        total: 0,
+        pending: 0,
+        completed: 0
       });
     } catch (error) {
       console.log('📊 [MechHome] Error fetching overview data:', error);
-      // Fallback to mock data
+      // Don't use mock data, show empty state
       setOverviewData({
-        total: 5,
-        pending: 2,
-        completed: 3
+        total: 0,
+        pending: 0,
+        completed: 0
       });
     }
   };
@@ -256,7 +283,7 @@ export default function MechHome() {
         // Fetch service requests where this mechanic is involved
         try {
           console.log('🔍 [MechHome] Calling service-requests/recent/ with token:', token.substring(0, 20) + '...');
-          const requestsResponse = await API.get('service-requests/recent/', {
+          const requestsResponse = await MechAPI.get('service-requests/recent/', {
             headers: { Authorization: `Bearer ${token}` }
           });
 
@@ -316,8 +343,20 @@ export default function MechHome() {
             const userHistory = profileResponse.data.user_history;
             console.log('📋 [MechHome] Fallback: Found user_history in profile:', userHistory.length, 'items');
             
+            // Filter for today's data only
+            const today = new Date();
+            const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+            
+            const todayHistory = userHistory.filter(item => {
+              const itemDate = new Date(item.recorded_at);
+              return itemDate >= todayStart && itemDate < todayEnd;
+            });
+            
+            console.log('📋 [MechHome] Today\'s history items for recent requests:', todayHistory.length);
+            
             // Transform user_history to recent requests format and limit to 3
-            const transformedRequests = userHistory.slice(0, 3).map((history, index) => ({
+            const transformedRequests = todayHistory.slice(0, 3).map((history, index) => ({
               _id: history.request_id || `history_${index}`,
               user_name: history.user_name || 'Unknown Customer',
               breakdown_type: history.breakdown_type || 'Unknown Issue',
@@ -338,43 +377,13 @@ export default function MechHome() {
         }
       }
 
-      console.log('📋 [MechHome] Using fallback mock data');
-      // Final fallback to mock data
-      setRecentRequests([
-        { 
-          _id: '1', 
-          user_name: 'John Doe', 
-          breakdown_type: 'Battery Issue', 
-          distance: '2.3 km',
-          status: 'pending'
-        },
-        { 
-          _id: '2', 
-          user_name: 'Alice Smith', 
-          breakdown_type: 'Engine Problem', 
-          distance: '1.8 km',
-          status: 'assigned'
-        }
-      ]);
+      console.log('📋 [MechHome] All API endpoints failed, showing empty data');
+      // Don't use mock data, show empty state
+      setRecentRequests([]);
     } catch (error) {
       console.log('📋 [MechHome] Error fetching recent requests:', error);
-      // Fallback to mock data
-      setRecentRequests([
-        { 
-          _id: '1', 
-          user_name: 'John Doe', 
-          breakdown_type: 'Battery Issue', 
-          distance: '2.3 km',
-          status: 'pending'
-        },
-        { 
-          _id: '2', 
-          user_name: 'Alice Smith', 
-          breakdown_type: 'Engine Problem', 
-          distance: '1.8 km',
-          status: 'assigned'
-        }
-      ]);
+      // Don't use mock data, show empty state
+      setRecentRequests([]);
     }
   };
 
@@ -515,7 +524,15 @@ export default function MechHome() {
         </View>
         {/* Today's Overview */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Today's Overview</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <Text style={styles.sectionTitle}>Today's Overview</Text>
+            {isLoading && (
+              <View style={styles.loadingIndicator}>
+                <Text style={styles.loadingText}>🔄</Text>
+              </View>
+            )}
+          </View>
+          
           <View style={styles.overviewRow}>
             <View style={styles.overviewItem}>
               <View style={[styles.overviewCircle, { backgroundColor: '#FF4D4F' }]}>
@@ -539,7 +556,14 @@ export default function MechHome() {
         </View>
         {/* Recent Requests */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Recent Requests</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <Text style={styles.sectionTitle}>Recent Requests</Text>
+            {isLoading && (
+              <View style={styles.loadingIndicator}>
+                <Text style={styles.loadingText}>🔄</Text>
+              </View>
+            )}
+          </View>
           {recentRequests.length === 0 ? (
             <View style={styles.emptyRequests}>
               <Text style={styles.emptyRequestsText}>No recent requests found</Text>
@@ -624,6 +648,18 @@ const styles = StyleSheet.create({
     width: 27,
     height: 27,
     resizeMode: 'contain',
+  },
+  loadingIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 12,
+    color: '#6B7280',
   },
   statusCard: {
     backgroundColor: '#fff',

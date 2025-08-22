@@ -208,7 +208,7 @@ export default function WorkerPage() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#f7cac9', '#f3e7e9', '#a1c4fd']}
+        colors={['#FF4D4F', '#FF7875']}
         style={styles.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}

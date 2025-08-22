@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Alert } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import backArrowIcon from '../images/arrow.png';
 import userIcon from '../images/user.png';
 import phoneIcon from '../images/phone.png';
@@ -59,22 +59,22 @@ export default function Requests() {
         const res = await axios.get(url);
         console.log("🔹 Pending requests API response:", res.data);
   
-        if (res.data.status === 'success') {
+                if (res.data.status === 'success') {
           const formatted = res.data.requests.map(req => {
             let myDistance = "N/A";
-  
+
             if (req.mechanics_list?.length) {
               const myEntry = req.mechanics_list.find(
                 m => String(m.mech_id) === String(mechanicId)
               );
               console.log("➡️ Matching mech entry for me:", myEntry);
-  
+
               if (myEntry?.road_distance_km != null) {
                 myDistance = `${Number(myEntry.road_distance_km).toFixed(2)} km`;
             }
 
             }
-  
+
             return {
               ...req,
               id: req._id,
@@ -88,6 +88,12 @@ export default function Requests() {
             };
           });
           setPendingRequests(formatted);
+          
+          // Update tab bar request count
+          if (global.updateTabBarRequestCount) {
+            global.updateTabBarRequestCount(formatted.length);
+            console.log('📊 Updated tab bar request count:', formatted.length);
+          }
         }
       } catch (err) {
         console.error('❌ Error fetching requests:', err?.response?.data || err.message);
@@ -98,6 +104,40 @@ export default function Requests() {
     const interval = setInterval(fetchRequests, 5000);
     return () => clearInterval(interval);
   }, [mechanicId]);
+
+  // Update tab bar count when pendingRequests changes
+  useEffect(() => {
+    if (global.updateTabBarRequestCount) {
+      const count = pendingRequests.length;
+      global.updateTabBarRequestCount(count);
+      console.log('📊 Tab bar count updated on mount/change:', count);
+      
+      // If no pending requests, ensure count is 0
+      if (count === 0) {
+        console.log('📊 No pending requests, setting count to 0');
+      }
+    }
+  }, [pendingRequests]);
+
+  // Cleanup: reset count when component unmounts
+  useEffect(() => {
+    return () => {
+      if (global.updateTabBarRequestCount) {
+        global.updateTabBarRequestCount(0);
+        console.log('📊 Tab bar count reset to 0 on unmount');
+      }
+    };
+  }, []);
+
+  // Update count when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (global.updateTabBarRequestCount && pendingRequests.length > 0) {
+        global.updateTabBarRequestCount(pendingRequests.length);
+        console.log('📊 Tab bar count refreshed on focus:', pendingRequests.length);
+      }
+    }, [pendingRequests.length])
+  );
   
 
   // Accept request handler

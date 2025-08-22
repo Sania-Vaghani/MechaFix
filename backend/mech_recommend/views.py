@@ -857,7 +857,7 @@ def get_today_overview(request):
             return JsonResponse({'error': f'Token decode error: {str(e)}'}, status=500)
 
         # Connect to MongoDB
-        db = connection.cursor().db_conn
+        # db is already defined at the top of the file
         
         # Get mechanic by username to get their ID
         mechanic = db['auth_mech'].find_one({'username': username})
@@ -952,7 +952,7 @@ def get_recent_requests(request):
             return JsonResponse({'error': f'Token decode error: {str(e)}'}, status=500)
 
         # Connect to MongoDB
-        db = connection.cursor().db_conn
+        # db is already defined at the top of the file
         
         # Get mechanic by username to get their ID
         mechanic = db['auth_mech'].find_one({'username': username})
@@ -1027,7 +1027,7 @@ def get_completed_requests(request):
             return JsonResponse({'error': f'Token decode error: {str(e)}'}, status=500)
 
         # Connect to MongoDB
-        db = connection.cursor().db_conn
+        # db is already defined at the top of the file
         
         # Get mechanic by username to get their ID
         mechanic = db['auth_mech'].find_one({'username': username})
