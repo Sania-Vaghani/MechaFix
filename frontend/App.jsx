@@ -38,6 +38,9 @@ import LogoutScreen from './src/components/LogoutScreen';
 import UserDetail from './src/components/UserDetail';
 import WorkerPage from './src/components/WorkerPage';
 import AssignedMech from './src/components/AssignedMech';
+import TrackingMap from './src/components/TrackingMap';
+
+import CustomerHistory from './src/components/CustomerHistory';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -126,7 +129,10 @@ export default function App() {
           <Stack.Screen name="FoundMechanic" component={FoundMechanic} />
             <Stack.Screen name="UserDetail" component={UserDetail} /> 
             <Stack.Screen name="WorkerPage" component={WorkerPage} /> 
-            {/* <Stack.Screen name="AssignedMech" component={AssignedMech} /> */}
+            <Stack.Screen name="AssignedMech" component={AssignedMech} />
+            <Stack.Screen name="TrackingMap" component={TrackingMap} />
+
+            <Stack.Screen name="CustomerHistory" component={CustomerHistory} />
           </Stack.Navigator>
         </NavigationContainer>
       </UserTypeProvider>

@@ -11,6 +11,8 @@ urlpatterns = [
     path('reset-password/', views.reset_password, name='reset_password'),
     path('me/', views.user_me, name='user_me'),
     path('mech/update-availability/', views.update_mechanic_availability, name='update_mechanic_availability'),
+    path('mech/<str:mechanic_id>/', views.get_mechanic_profile, name='get_mechanic_profile'),
+    path('test-user-history/', views.test_user_history, name='test_user_history'),
     path('sos/whatsapp/',views.send_sos_whatsapp,name='send_sos_whatsapp'),
     path('mechanics/<str:mech_id>/', views.get_mechanic, name='get_mechanic'),
 ]

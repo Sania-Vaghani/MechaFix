@@ -42,8 +42,36 @@ export default function WorkerPage() {
         let res = await axios.get(url);
         if (res.data?.status === 'success' && res.data.requests?.length) {
           const r = res.data.requests[0];
+          console.log('📋 Found assigned request:', r);
+          
+          // Get full request details using request-detail endpoint
+          try {
+            const detailRes = await axios.get(`http://10.0.2.2:8000/api/request-detail/${r._id || r.id}/`);
+            if (detailRes.data?.status === 'success' && detailRes.data?.request) {
+              const fullReq = detailRes.data.request;
+              console.log('📄 Full request details:', fullReq);
+              
+              setAssignment({
+                id: fullReq._id,
+                name: fullReq.user_name || 'Unknown User',
+                phone: fullReq.user_phone || 'N/A',
+                issue: fullReq.breakdown_type || 'N/A',
+                address: fullReq.address || '',
+                car: `${fullReq.car_model || ''} (${fullReq.license_plate || '-'})`,
+                status: 'assigned',
+                lat: typeof fullReq.lat === 'number' ? fullReq.lat : parseFloat(fullReq.lat),
+                lon: typeof fullReq.lon === 'number' ? fullReq.lon : parseFloat(fullReq.lon),
+                fullRequest: fullReq, // Store full request for debugging
+              });
+              return;
+            }
+          } catch (detailErr) {
+            console.log('⚠️ Failed to get full request details:', detailErr?.message);
+          }
+          
+          // Fallback to basic data
           setAssignment({
-            id: r.id,
+            id: r._id || r.id, // Use _id if available, fallback to id
             name: r.user_name || 'Unknown User',
             phone: r.user_phone || 'N/A',
             issue: r.breakdown_type || 'N/A',
@@ -94,7 +122,72 @@ export default function WorkerPage() {
       Alert.alert('OTP', 'Please enter the 4-digit OTP.');
       return;
     }
-    Alert.alert('OTP', `Submitted OTP: ${code}`);
+    
+    console.log('🔐 Submitting OTP:', code);
+    console.log('📋 Assignment data:', assignment);
+    console.log('👷 Mechanic ID:', mechanicId);
+    console.log('🆔 Request ID being sent:', assignment.id);
+    console.log('🔍 Assignment ID type:', typeof assignment.id);
+    
+    if (assignment.fullRequest) {
+      console.log('📄 Full request data available:', assignment.fullRequest);
+      console.log('   assigned_worker:', assignment.fullRequest.assigned_worker);
+      console.log('   mechanics_list:', assignment.fullRequest.mechanics_list);
+    }
+    
+    if (!assignment?.id || !mechanicId) {
+      Alert.alert('Error', 'Missing assignment or mechanic information.');
+      return;
+    }
+    
+    try {
+      const payload = {
+        request_id: assignment.id,
+        otp_code: code,
+        worker_id: mechanicId
+      };
+      console.log('📤 Sending payload:', payload);
+      
+      const response = await axios.post('http://10.0.2.2:8000/api/verify-otp-complete/', payload);
+      
+      console.log('📥 Response:', response.data);
+      
+      if (response.data.status === 'success') {
+        Alert.alert(
+          'Success!', 
+          'OTP verified and request marked as completed.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Clear the assignment and OTP
+                setAssignment(null);
+                setOtp(['', '', '', '']);
+                // Navigate back or show completion message
+                navigation.goBack();
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', response.data.error || 'Failed to verify OTP');
+      }
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      let errorMessage = 'Failed to verify OTP. Please try again.';
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Access denied. You are not authorized for this request.';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Request not found. Please check your assignment.';
+      }
+      
+      Alert.alert('Error', errorMessage);
+    }
   };
 
   const hasCoords = assignment && typeof assignment?.lat === 'number' && typeof assignment?.lon === 'number' && !Number.isNaN(assignment.lat) && !Number.isNaN(assignment.lon);

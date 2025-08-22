@@ -18,13 +18,14 @@ import API from '../services/api';
 export default function MechHome() {
   const [available, setAvailable] = useState(true);
   const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [overviewData, setOverviewData] = useState({
+    total: 0,
+    pending: 0,
+    completed: 0
+  });
+  const [recentRequests, setRecentRequests] = useState([]);
   const navigation = useNavigation();
-
-  // Placeholder data
-  const recentRequests = [
-    { id: 1, name: 'John Doe', issue: 'Battery Issue', distance: '2.3 km', action: 'View' },
-    { id: 2, name: 'Alice Smith', issue: 'Engine Problem', distance: '1.8 km', action: 'View' },
-  ];
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -41,8 +42,341 @@ export default function MechHome() {
         }
       }
     };
-    fetchProfile();
+    
+    const fetchData = async () => {
+      await Promise.all([
+        fetchProfile(),
+        fetchOverviewData(),
+        fetchRecentRequests()
+      ]);
+      setIsLoading(false);
+    };
+    
+    fetchData();
   }, []);
+
+  // Add token validation function
+  const validateToken = (token) => {
+    try {
+      // Simple JWT token validation - check if it's a valid format
+      if (!token || typeof token !== 'string') {
+        return false;
+      }
+      
+      // Check if token has 3 parts (header.payload.signature)
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        return false;
+      }
+      
+      // Try to decode the payload to check expiration
+      try {
+        const payload = JSON.parse(atob(parts[1]));
+        const currentTime = Math.floor(Date.now() / 1000);
+        
+        if (payload.exp && payload.exp < currentTime) {
+          console.log('❌ [MechHome] JWT token is expired');
+          return false;
+        }
+        
+        console.log('✅ [MechHome] JWT token is valid, expires at:', new Date(payload.exp * 1000));
+        return true;
+      } catch (decodeError) {
+        console.log('❌ [MechHome] Failed to decode JWT payload:', decodeError);
+        return false;
+      }
+    } catch (error) {
+      console.log('❌ [MechHome] Token validation error:', error);
+      return false;
+    }
+  };
+
+  const fetchOverviewData = async () => {
+    try {
+      const token = await AsyncStorage.getItem('jwtToken');
+      if (!token) {
+        console.log('❌ [MechHome] No JWT token found in AsyncStorage');
+        return;
+      }
+
+      // Validate token before making API calls
+      if (!validateToken(token)) {
+        console.log('❌ [MechHome] JWT token is invalid or expired');
+        return;
+      }
+
+      console.log('🔑 [MechHome] JWT Token found:', token.substring(0, 20) + '...');
+      console.log('📊 [MechHome] Fetching overview data from service_requests...');
+
+      // Get current mechanic's profile to access their ID
+      const mechResponse = await API.get('users/me/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (mechResponse.data && mechResponse.data._id) {
+        const mechanicId = mechResponse.data._id;
+        console.log('📊 [MechHome] Mechanic ID:', mechanicId);
+        
+        // Primary: Try to get today's overview from dedicated endpoint
+        try {
+          console.log('🔍 [MechHome] Calling service-requests/today-overview/ with token:', token.substring(0, 20) + '...');
+          const overviewResponse = await API.get('service-requests/today-overview/', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (overviewResponse.data && overviewResponse.data.status === 'success') {
+            const overview = overviewResponse.data.overview;
+            console.log('📊 [MechHome] Today\'s overview from endpoint:', overview);
+            setOverviewData(overview);
+            return;
+          }
+        } catch (overviewError) {
+          console.log('📊 [MechHome] Today\'s overview endpoint failed:', overviewError.response?.status, overviewError.response?.data);
+        }
+
+        // Fallback: Fetch service requests and calculate stats
+        try {
+          const requestsResponse = await API.get('service-requests/recent/', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (requestsResponse.data && requestsResponse.data.requests) {
+            const allRequests = requestsResponse.data.requests;
+            console.log('📊 [MechHome] Found service requests:', allRequests.length, 'items');
+            
+            // Filter requests where this mechanic is involved (either in mechanics_list or assigned_worker)
+            const mechanicRequests = allRequests.filter(request => {
+              // Check if mechanic is in mechanics_list
+              const inMechanicsList = request.mechanics_list && 
+                request.mechanics_list.some(mech => mech.mech_id === mechanicId);
+              
+              // Check if mechanic is assigned worker
+              const isAssignedWorker = request.assigned_worker && 
+                request.assigned_worker.worker_id === mechanicId;
+              
+              return inMechanicsList || isAssignedWorker;
+            });
+
+            console.log('📊 [MechHome] Mechanic-specific requests:', mechanicRequests.length, 'items');
+            
+            // Calculate stats
+            const total = mechanicRequests.length;
+            const completed = mechanicRequests.filter(req => {
+              // Check if any mechanic in mechanics_list has completed status
+              const hasCompleted = req.mechanics_list && 
+                req.mechanics_list.some(mech => mech.mech_id === mechanicId && mech.status === 'completed');
+              return hasCompleted;
+            }).length;
+            
+            const pending = mechanicRequests.filter(req => {
+              // Check if any mechanic in mechanics_list has pending/accepted status
+              const hasPending = req.mechanics_list && 
+                req.mechanics_list.some(mech => 
+                  mech.mech_id === mechanicId && 
+                  (mech.status === 'pending' || mech.status === 'accepted')
+                );
+              return hasPending;
+            }).length;
+            
+            console.log('📊 [MechHome] Overview stats from service_requests:', { total, completed, pending });
+            setOverviewData({ total, completed, pending });
+            return;
+          }
+        } catch (requestsError) {
+          console.log('📊 [MechHome] Service requests endpoint failed:', requestsError);
+        }
+
+        // Final fallback: Try to get data from user_history as before
+        try {
+          const profileResponse = await API.get(`users/mech/${mechanicId}/`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (profileResponse.data && profileResponse.data.user_history) {
+            const userHistory = profileResponse.data.user_history;
+            console.log('📊 [MechHome] Final fallback: Found user_history in profile:', userHistory.length, 'items');
+            
+            const total = userHistory.length;
+            const completed = userHistory.filter(req => req.status === 'completed').length;
+            const pending = userHistory.filter(req => req.status === 'pending').length;
+            
+            console.log('📊 [MechHome] Overview stats via final fallback:', { total, completed, pending });
+            setOverviewData({ total, completed, pending });
+            return;
+          }
+        } catch (profileError) {
+          console.log('📊 [MechHome] Profile endpoint fallback also failed:', profileError);
+        }
+      }
+
+      console.log('📊 [MechHome] Using fallback mock data');
+      // Final fallback to mock data
+      setOverviewData({
+        total: 5,
+        pending: 2,
+        completed: 3
+      });
+    } catch (error) {
+      console.log('📊 [MechHome] Error fetching overview data:', error);
+      // Fallback to mock data
+      setOverviewData({
+        total: 5,
+        pending: 2,
+        completed: 3
+      });
+    }
+  };
+
+  const fetchRecentRequests = async () => {
+    try {
+      const token = await AsyncStorage.getItem('jwtToken');
+      if (!token) {
+        console.log('❌ [MechHome] No JWT token found in AsyncStorage for recent requests');
+        return;
+      }
+
+      // Validate token before making API calls
+      if (!validateToken(token)) {
+        console.log('❌ [MechHome] JWT token is invalid or expired for recent requests');
+        return;
+      }
+
+      console.log('🔑 [MechHome] JWT Token for recent requests:', token.substring(0, 20) + '...');
+      console.log('📋 [MechHome] Fetching recent requests from service_requests...');
+
+      // Get current mechanic's profile to access their ID
+      const mechResponse = await API.get('users/me/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (mechResponse.data && mechResponse.data._id) {
+        const mechanicId = mechResponse.data._id;
+        console.log('📋 [MechHome] Mechanic ID:', mechanicId);
+        
+        // Fetch service requests where this mechanic is involved
+        try {
+          console.log('🔍 [MechHome] Calling service-requests/recent/ with token:', token.substring(0, 20) + '...');
+          const requestsResponse = await API.get('service-requests/recent/', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (requestsResponse.data && requestsResponse.data.requests) {
+            const allRequests = requestsResponse.data.requests;
+            console.log('📋 [MechHome] Found service requests:', allRequests.length, 'items');
+            
+            // Filter requests where this mechanic is involved (either in mechanics_list or assigned_worker)
+            const mechanicRequests = allRequests.filter(request => {
+              // Check if mechanic is in mechanics_list
+              const inMechanicsList = request.mechanics_list && 
+                request.mechanics_list.some(mech => mech.mech_id === mechanicId);
+              
+              // Check if mechanic is assigned worker
+              const isAssignedWorker = request.assigned_worker && 
+                request.assigned_worker.worker_id === mechanicId;
+              
+              return inMechanicsList || isAssignedWorker;
+            });
+
+            console.log('📋 [MechHome] Mechanic-specific requests:', mechanicRequests.length, 'items');
+            
+            // Transform service_requests data to recent requests format and limit to 3
+            const transformedRequests = mechanicRequests.slice(0, 3).map((request, index) => {
+              // Find the mechanic's specific data from mechanics_list
+              const mechanicData = request.mechanics_list?.find(mech => mech.mech_id === mechanicId);
+              
+              return {
+                _id: request._id || `request_${index}`,
+                user_name: request.user_name || 'Unknown Customer',
+                breakdown_type: request.breakdown_type || request.issue_type || 'Unknown Issue',
+                distance: mechanicData?.distance_km ? `${mechanicData.distance_km.toFixed(1)} km` : 'N/A',
+                status: mechanicData?.status || 'pending',
+                user_phone: request.user_phone || 'N/A',
+                car_model: request.car_model || 'Unknown Car',
+                license_plate: request.license_plate || 'No Plate',
+                recorded_at: request.created_at || new Date().toISOString(),
+                request_data: request // Keep full request data for reference
+              };
+            });
+
+            console.log('📋 [MechHome] Transformed recent requests from service_requests:', transformedRequests);
+            setRecentRequests(transformedRequests);
+            return;
+          }
+        } catch (requestsError) {
+          console.log('📋 [MechHome] Service requests endpoint failed:', requestsError.response?.status, requestsError.response?.data);
+        }
+
+        // Fallback: Try to get data from user_history as before
+        try {
+          const profileResponse = await API.get(`users/mech/${mechanicId}/`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (profileResponse.data && profileResponse.data.user_history) {
+            const userHistory = profileResponse.data.user_history;
+            console.log('📋 [MechHome] Fallback: Found user_history in profile:', userHistory.length, 'items');
+            
+            // Transform user_history to recent requests format and limit to 3
+            const transformedRequests = userHistory.slice(0, 3).map((history, index) => ({
+              _id: history.request_id || `history_${index}`,
+              user_name: history.user_name || 'Unknown Customer',
+              breakdown_type: history.breakdown_type || 'Unknown Issue',
+              distance: history.distance || history.distance_km || 'N/A',
+              status: history.status || 'completed',
+              user_phone: history.user_phone || 'N/A',
+              car_model: history.car_model || 'Unknown Car',
+              license_plate: history.license_plate || 'No Plate',
+              recorded_at: history.recorded_at || new Date().toISOString()
+            }));
+
+            console.log('📋 [MechHome] Transformed recent requests via fallback:', transformedRequests);
+            setRecentRequests(transformedRequests);
+            return;
+          }
+        } catch (profileError) {
+          console.log('📋 [MechHome] Profile endpoint fallback also failed:', profileError);
+        }
+      }
+
+      console.log('📋 [MechHome] Using fallback mock data');
+      // Final fallback to mock data
+      setRecentRequests([
+        { 
+          _id: '1', 
+          user_name: 'John Doe', 
+          breakdown_type: 'Battery Issue', 
+          distance: '2.3 km',
+          status: 'pending'
+        },
+        { 
+          _id: '2', 
+          user_name: 'Alice Smith', 
+          breakdown_type: 'Engine Problem', 
+          distance: '1.8 km',
+          status: 'assigned'
+        }
+      ]);
+    } catch (error) {
+      console.log('📋 [MechHome] Error fetching recent requests:', error);
+      // Fallback to mock data
+      setRecentRequests([
+        { 
+          _id: '1', 
+          user_name: 'John Doe', 
+          breakdown_type: 'Battery Issue', 
+          distance: '2.3 km',
+          status: 'pending'
+        },
+        { 
+          _id: '2', 
+          user_name: 'Alice Smith', 
+          breakdown_type: 'Engine Problem', 
+          distance: '1.8 km',
+          status: 'assigned'
+        }
+      ]);
+    }
+  };
 
   const handleToggle = async (value) => {
     setAvailable(value);
@@ -70,6 +404,45 @@ export default function MechHome() {
     .catch(err => {
       console.error('API error:', err);
     });
+  };
+
+  const handleAddMechanic = () => {
+    navigation.navigate('Services');
+  };
+
+  const handleViewHistory = () => {
+    navigation.navigate('CustomerHistory');
+  };
+
+  const handleViewRequest = (request) => {
+    // Navigate to request details or worker page
+    navigation.navigate('WorkerPage', { requestId: request._id });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending':
+        return '#F59E0B';
+      case 'assigned':
+        return '#3B82F6';
+      case 'completed':
+        return '#10B981';
+      default:
+        return '#6B7280';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'Pending';
+      case 'assigned':
+        return 'Assigned';
+      case 'completed':
+        return 'Completed';
+      default:
+        return status;
+    }
   };
 
   return (
@@ -125,7 +498,7 @@ export default function MechHome() {
             </View>
             <Text style={[styles.infoTitle, { color: '#fff' }]}>Add Mechanic</Text>
             <Text style={[styles.infoDesc, { color: '#fff' }]}>Add team members</Text>
-            <TouchableOpacity style={[styles.infoBtn, { backgroundColor: '#fff' }]}>
+            <TouchableOpacity style={[styles.infoBtn, { backgroundColor: '#fff' }]} onPress={handleAddMechanic}>
               <Text style={[styles.infoBtnText, { color: '#2563EB' }]}>Add Now</Text>
             </TouchableOpacity>
           </View>
@@ -135,7 +508,7 @@ export default function MechHome() {
             </View>
             <Text style={[styles.infoTitle, { color: '#fff' }]}>Customer History</Text>
             <Text style={[styles.infoDesc, { color: '#fff' }]}>View past services</Text>
-            <TouchableOpacity style={[styles.infoBtn, { backgroundColor: '#fff' }]}> 
+            <TouchableOpacity style={[styles.infoBtn, { backgroundColor: '#fff' }]} onPress={handleViewHistory}> 
               <Text style={[styles.infoBtnText, { color: '#22C55E' }]}>View History</Text>
             </TouchableOpacity>
           </View>
@@ -146,19 +519,19 @@ export default function MechHome() {
           <View style={styles.overviewRow}>
             <View style={styles.overviewItem}>
               <View style={[styles.overviewCircle, { backgroundColor: '#FF4D4F' }]}>
-                <Text style={styles.overviewNum}>5</Text>
+                <Text style={styles.overviewNum}>{overviewData.total}</Text>
               </View>
               <Text style={styles.overviewLabel}>Requests</Text>
             </View>
             <View style={styles.overviewItem}>
               <View style={[styles.overviewCircle, { backgroundColor: '#F59E0B' }]}>
-                <Text style={styles.overviewNum}>2</Text>
+                <Text style={styles.overviewNum}>{overviewData.pending}</Text>
               </View>
               <Text style={styles.overviewLabel}>Pending</Text>
             </View>
             <View style={styles.overviewItem}>
               <View style={[styles.overviewCircle, { backgroundColor: '#22C55E' }]}>
-                <Text style={styles.overviewNum}>3</Text>
+                <Text style={styles.overviewNum}>{overviewData.completed}</Text>
               </View>
               <Text style={styles.overviewLabel}>Completed</Text>
             </View>
@@ -167,18 +540,35 @@ export default function MechHome() {
         {/* Recent Requests */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Recent Requests</Text>
-          {recentRequests.map(req => (
-            <View key={req.id} style={styles.requestRow}>
-              <View style={styles.requestAvatar}><Text style={styles.requestAvatarText}>{req.name.split(' ').map(n => n[0]).join('')}</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.requestName}>{req.name}</Text>
-                <Text style={styles.requestIssue}>{req.issue} • {req.distance} away</Text>
-              </View>
-              <TouchableOpacity style={[styles.requestBtn, { backgroundColor: '#3B82F6' }]}>
-                <Text style={styles.requestBtnText}>{req.action}</Text>
-              </TouchableOpacity>
+          {recentRequests.length === 0 ? (
+            <View style={styles.emptyRequests}>
+              <Text style={styles.emptyRequestsText}>No recent requests found</Text>
+              <Text style={styles.emptyRequestsSubtext}>Service requests will appear here</Text>
             </View>
-          ))}
+          ) : (
+            recentRequests.map(req => (
+              <View key={req._id} style={styles.requestRow}>
+                <View style={styles.requestAvatar}>
+                  <Text style={styles.requestAvatarText}>
+                    {req.user_name?.split(' ').map(n => n[0]).join('') || 'CU'}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.requestName}>{req.user_name}</Text>
+                  <Text style={styles.requestIssue}>{req.breakdown_type} • {req.distance} away</Text>
+                  {req.car_model && req.car_model !== 'Unknown Car' && (
+                    <Text style={styles.requestCar}>{req.car_model} {req.license_plate !== 'No Plate' ? `• ${req.license_plate}` : ''}</Text>
+                  )}
+                </View>
+                <TouchableOpacity 
+                  style={[styles.requestBtn, { backgroundColor: getStatusColor(req.status) }]} 
+                  onPress={() => handleViewRequest(req)}
+                >
+                  <Text style={styles.requestBtnText}>{getStatusText(req.status)}</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
         </View>
 
       </ScrollView>
@@ -438,5 +828,27 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 15,
     fontFamily: 'Poppins-Bold',
+  },
+  requestCar: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+    marginTop: 2,
+  },
+  emptyRequests: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  emptyRequestsText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#22223B',
+    fontFamily: 'Poppins-Bold',
+    marginBottom: 5,
+  },
+  emptyRequestsSubtext: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
   },
 });

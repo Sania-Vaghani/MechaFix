@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Linking, Alert } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import CustomText from '../../Components/CustomText';
 import MapView, { Marker } from 'react-native-maps';
@@ -7,23 +7,42 @@ import backArrowIcon from '../images/arrow.png';
 import phoneIcon from '../images/phone.png';
 import messageIcon from '../images/message.png';
 import locIcon from '../images/loc.png';
+import { useRoute } from '@react-navigation/native';
+
+const haversine = (lat1, lon1, lat2, lon2) => {
+  const toRad = (x) => (x * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+};
 
 export default function AssignedMech({ navigation }) {
-  const mechanic = {
-    name: 'John Doe',
-    rating: '4.8',
-    experience: '5 years',
-    specialization: 'Car Mechanic',
-    phone: '+1 234 567 8900',
-    eta: '15 mins',
-    distance: '3.57 km',
-    location: 'LJ College Road, Ahmedabad, GJ, India',
-    latitude: 22.991227,
-    longitude: 72.488415,
-  };
+  const route = useRoute();
+  const assigned = route.params?.assigned_worker || {};
+  const garageCoords = route.params?.garage_coords || assigned?.garage_coords || {};
+  const userCoords = route.params?.user_coords || {};
+  const mechName = assigned?.worker_name || 'Mechanic Worker';
+  const mechPhone = assigned?.worker_phone || '';
+  const distanceKm = (userCoords?.lat && garageCoords?.lat)
+    ? haversine(Number(userCoords.lat), Number(userCoords.lon), Number(garageCoords.lat), Number(garageCoords.lon)).toFixed(2)
+    : null;
 
   const [isLoading, setIsLoading] = useState(false);
-  const [address, setAddress] = useState(mechanic.location);
+  const [address, setAddress] = useState('');
+  const [otp, setOtp] = useState('');
+
+  useEffect(() => {
+    // Get OTP from route params or generate a placeholder if not available
+    const routeOtp = route.params?.otp_code || assigned?.otp_code;
+    if (routeOtp) {
+      setOtp(routeOtp.toString());
+    } else {
+      // Fallback to a placeholder if OTP not available
+      setOtp('----');
+    }
+  }, [route.params?.otp_code, assigned?.otp_code]);
 
   return (
     <View style={styles.container}>
@@ -50,31 +69,35 @@ export default function AssignedMech({ navigation }) {
           </View>
 
           <CustomText style={styles.locationAddress}>
-            {isLoading ? <ActivityIndicator size="small" color="#D9534F" /> : address}
+            {isLoading ? <ActivityIndicator size="small" color="#D9534F" /> : (address || 'Garage location shown on map')}
           </CustomText>
-          <CustomText style={styles.locationMeta}>Distance: {mechanic.distance}</CustomText>
-          <CustomText style={styles.locationMeta}>ETA: {mechanic.eta}</CustomText>
+          {!!distanceKm && <CustomText style={styles.locationMeta}>Distance (as-the-crow-flies): {distanceKm} km</CustomText>}
 
           <View style={{ marginTop: 10, borderRadius: 12, overflow: 'hidden' }}>
             <MapView
               style={{ width: '100%', height: 160 }}
               initialRegion={{
-                latitude: mechanic.latitude,
-                longitude: mechanic.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              }}
-              region={{
-                latitude: mechanic.latitude,
-                longitude: mechanic.longitude,
+                latitude: Number(garageCoords.lat) || 22.991227,
+                longitude: Number(garageCoords.lon) || 72.488415,
                 latitudeDelta: 0.01,
                 longitudeDelta: 0.01,
               }}
             >
-              <Marker
-                coordinate={{ latitude: mechanic.latitude, longitude: mechanic.longitude }}
-                title="Mechanic Location"
-              />
+              {!!userCoords?.lat && !!userCoords?.lon && (
+                <Marker
+                  coordinate={{ latitude: Number(userCoords.lat), longitude: Number(userCoords.lon) }}
+                  title="Your Location"
+                  description={route.params?.user_name}
+                />
+              )}
+              {!!garageCoords?.lat && !!garageCoords?.lon && (
+                <Marker
+                  coordinate={{ latitude: Number(garageCoords.lat), longitude: Number(garageCoords.lon) }}
+                  title={assigned?.garage_name || 'Garage'}
+                  description="Garage Location"
+                  pinColor="#FF4D4F"
+                />
+              )}
             </MapView>
           </View>
         </View>
@@ -82,36 +105,72 @@ export default function AssignedMech({ navigation }) {
         {/* Profile Section */}
         <View style={styles.profileCard}>
           <View style={styles.profileImage}>
-            <Text style={styles.initials}>{mechanic.name.split(' ').map(n => n[0]).join('')}</Text>
+            <Text style={styles.initials}>{mechName.split(' ').map(n => n[0]).join('')}</Text>
           </View>
           <View style={styles.profileInfo}>
-            <CustomText style={styles.name}>{mechanic.name}</CustomText>
+            <CustomText style={styles.name}>{mechName}</CustomText>
             <View style={styles.ratingContainer}>
-              <CustomText style={styles.ratingText}>{mechanic.rating}</CustomText>
+              <CustomText style={styles.ratingText}>--</CustomText>
               <Text style={styles.ratingIcon}>★</Text>
             </View>
-            <CustomText style={styles.specialization}>{mechanic.specialization}</CustomText>
-            <CustomText style={styles.experience}>{mechanic.experience} experience</CustomText>
+            <CustomText style={styles.specialization}>{assigned?.garage_name}</CustomText>
+            <CustomText style={styles.experience}>Assigned worker</CustomText>
           </View>
+          <TouchableOpacity
+            style={styles.callButton}
+            onPress={async () => {
+              console.log('📞 Call button pressed. Available data:', {
+                mechPhone,
+                assigned,
+                worker_phone: assigned?.worker_phone,
+                mech_phone: assigned?.mech_phone,
+                phone: assigned?.phone
+              });
+              
+              // Try multiple possible phone number fields
+              const phoneToCall = mechPhone || assigned?.mech_phone || assigned?.phone || assigned?.worker_phone;
+              
+              if (!phoneToCall || phoneToCall === 'N/A') {
+                Alert.alert('Error', 'Phone number not available');
+                return;
+              }
+              
+              const tel = `tel:${phoneToCall}`;
+              const can = await Linking.canOpenURL(tel);
+              if (can) {
+                Linking.openURL(tel);
+              } else {
+                Alert.alert('Error', 'Calling not supported');
+              }
+            }}
+          >
+            <Image source={phoneIcon} style={styles.callIcon} />
+          </TouchableOpacity>
         </View>
 
-        {/* Contact Section */}
-        <View style={styles.section}>
-          <CustomText style={styles.sectionTitle}>Contact Mechanic</CustomText>
-          <View style={styles.contactOptions}>
-            <TouchableOpacity style={styles.contactButton}>
-              <Image source={phoneIcon} style={styles.contactIcon} />
-              <CustomText style={styles.contactButtonText}>Call Now</CustomText>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.contactButton, styles.messageButton]}>
-              <Image source={messageIcon} style={[styles.contactIcon, styles.messageIcon]} />
-              <CustomText style={[styles.contactButtonText, styles.messageButtonText]}>Message</CustomText>
-            </TouchableOpacity>
+        {/* OTP Section */}
+        <View style={styles.otpSection}>
+          <CustomText style={styles.otpTitle}>4-Digit Code for Verification</CustomText>
+          <View style={styles.otpBox}>
+            <CustomText style={styles.otpText}>{otp}</CustomText>
           </View>
+          <CustomText style={styles.otpSubtitle}>
+            Share this code with the mechanic worker after he completes his service.
+          </CustomText>
         </View>
 
         {/* Track Mechanic Button */}
-        <TouchableOpacity style={styles.trackButton}>
+        <TouchableOpacity 
+          style={styles.trackButton}
+          onPress={() => {
+            navigation.navigate('TrackingMap', {
+              user_coords: userCoords,
+              garage_coords: garageCoords,
+              assigned_worker: assigned,
+              user_name: route.params?.user_name
+            });
+          }}
+        >
           <CustomText style={styles.trackButtonText}>Track Mechanic</CustomText>
         </TouchableOpacity>
       </View>
@@ -149,17 +208,16 @@ const styles = StyleSheet.create({
   ratingIcon: { color: '#F59E0B' },
   specialization: { color: '#4B5563', marginBottom: 2 },
   experience: { color: '#6B7280' },
-
-  section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 12 },
-  contactOptions: { flexDirection: 'row', justifyContent: 'space-between' },
-  contactButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3B82F6', padding: 12, borderRadius: 10, marginRight: 10 },
-  messageButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#3B82F6', marginRight: 0 },
-  contactIcon: { width: 20, height: 20, marginRight: 8, tintColor: '#fff' },
-  messageIcon: { tintColor: '#3B82F6' },
-  contactButtonText: { color: '#fff', fontWeight: '600' },
-  messageButtonText: { color: '#3B82F6' },
+  callButton: { backgroundColor: '#3B82F6', width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginLeft: 16 },
+  callIcon: { width: 22, height: 22, tintColor: '#fff' },
 
   trackButton: { backgroundColor: '#10B981', padding: 16, borderRadius: 10, alignItems: 'center', marginTop: 'auto', marginBottom: 20 },
   trackButtonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+
+  // OTP Styles
+  otpSection: { alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 20, marginBottom: 20, elevation: 2 },
+  otpTitle: { fontSize: 16, fontWeight: '600', color: '#1F2937', marginBottom: 12 },
+  otpBox: { backgroundColor: '#D1FAE5', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 25, marginBottom: 12 },
+  otpText: { fontSize: 28, fontWeight: 'bold', color: '#065F46', letterSpacing: 5 },
+  otpSubtitle: { fontSize: 13, color: '#6B7280', textAlign: 'center' },
 });

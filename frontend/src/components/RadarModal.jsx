@@ -21,7 +21,7 @@ function randomPolar(radius) {
   };
 }
 
-const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakdownType,user,carDetails }) => {
+const RadarModal = ({ visible, onClose, onNoMechanicsFound, onAssigned, userLocation, breakdownType, user, carDetails }) => {
   const sweepAnim = useRef(new Animated.Value(0)).current;
   const radarPulse = useRef(new Animated.Value(1)).current;
   const [mechanicDots, setMechanicDots] = useState([]);
@@ -30,6 +30,8 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
   const timerRef = useRef(null);
   const [fetchedMechanics, setFetchedMechanics] = useState([]); // Add this state
   const [localUser, setLocalUser] = useState(null);
+  const [requestId, setRequestId] = useState(null);
+  const pollRef = useRef(null);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -106,12 +108,42 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
 
       const res = await axios.post('http://10.0.2.2:8000/api/service-request/', payload);
       console.log("✅ Service request created:", res.data);
+      if (res?.data?.request_id) {
+        setRequestId(res.data.request_id);
+        try { await AsyncStorage.setItem('lastRequestId', String(res.data.request_id)); } catch (e) {}
+      }
     } catch (err) {
       console.error("❌ Error creating service request:", err);
     }
   };
-  
-  
+
+  const startPollingForAssignment = (reqId) => {
+    if (!reqId) return;
+    // Clear if already polling
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await axios.get(`http://10.0.2.2:8000/api/request-detail/${reqId}/`);
+        if (res?.data?.status === 'success') {
+          const req = res.data.request;
+          if (req?.assigned_worker) {
+            // Stop timers
+            if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+            if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+            // Close modal and notify parent
+            onClose && onClose();
+            onAssigned && onAssigned(req);
+          }
+        }
+      } catch (e) {
+        // Ignore transient errors
+      }
+    }, 2000);
+  };
+
   // Transform coordinates if they come in the wrong format
   const getCoordinates = () => {
     if (userLocation) {
@@ -194,7 +226,7 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
         if (onNoMechanicsFound) {
           onNoMechanicsFound(fetchedMechanics);
         }
-      }, 10000);
+      }, 120000);
 
       sweepAnim.setValue(0);
       sweepLoop = Animated.loop(
@@ -251,7 +283,17 @@ const RadarModal = ({ visible, onClose, onNoMechanicsFound, userLocation, breakd
       dotOpacities.forEach(opacity => opacity.setValue(0));
       dotPulses.forEach(pulse => pulse.setValue(1));
     };
-  }, [visible, onClose, onNoMechanicsFound, userLocation, breakdownType,localUser,carDetails]); // Add onClose to dependency array
+  }, [visible, onClose, onNoMechanicsFound, userLocation, breakdownType, localUser, carDetails]); // Add onClose to dependency array
+
+  // Start polling when we have a request id
+  useEffect(() => {
+    if (requestId && visible) {
+      startPollingForAssignment(requestId);
+    }
+    return () => {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    };
+  }, [requestId, visible]);
 
   const rotate = sweepAnim.interpolate({
     inputRange: [0, 1],

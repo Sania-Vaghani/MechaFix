@@ -275,6 +275,19 @@ useEffect(() => {
     );
   };
 
+  const handleAssigned = (req) => {
+    // Navigate to assigned view with details
+    navigation.navigate('AssignedMech', {
+      assigned_worker: req.assigned_worker,
+      user_coords: { lat: req.lat, lon: req.lon },
+      garage_coords: req.assigned_worker?.garage_coords || req.garage_coords || null,
+      road_distance_km: req.mechanics_list?.[0]?.road_distance_km || null,
+      request_id: req._id,
+      user_name: req.user_name,
+      user_phone: req.user_phone,
+    });
+  };
+
   return (
     <LinearGradient colors={["#f7cac9", "#f3e7e9", "#a1c4fd"]} style={styles.gradient}>
       {/* Header */}
@@ -424,6 +437,7 @@ useEffect(() => {
   visible={showRadarModal}
   onClose={() => setShowRadarModal(false)}
   onNoMechanicsFound={handleNoMechanicsFound}
+  onAssigned={handleAssigned}
   user={loggedInUser}
   userLocation={prevCoords.current ? {
     lat: prevCoords.current.latitude,

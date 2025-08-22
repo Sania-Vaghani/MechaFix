@@ -598,3 +598,85 @@ def get_mechanic(request, mech_id):
         return JsonResponse(mech, safe=False)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+
+@csrf_exempt
+def get_mechanic_profile(request, mechanic_id):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'GET method required'}, status=405)
+
+    try:
+        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if not token:
+            return JsonResponse({'error': 'Authorization token required'}, status=401)
+
+        print(f"🔍 [DEBUG] Getting mechanic profile for ID: {mechanic_id}")
+
+        # Get database connection
+        db = connection.cursor().db_conn
+        
+        # Fetch mechanic profile from auth_mech collection
+        mechanic = db['auth_mech'].find_one({'_id': ObjectId(mechanic_id)})
+        
+        print(f"🔍 [DEBUG] Raw mechanic data from DB: {mechanic}")
+        
+        if not mechanic:
+            return JsonResponse({'error': 'Mechanic not found'}, status=404)
+
+        # Check if user_history exists
+        user_history = mechanic.get('user_history', [])
+        print(f"🔍 [DEBUG] User history from DB: {user_history}")
+        print(f"🔍 [DEBUG] User history type: {type(user_history)}")
+        print(f"🔍 [DEBUG] User history length: {len(user_history) if user_history else 0}")
+
+        # Transform the data to include user_history
+        profile_data = {
+            '_id': str(mechanic['_id']),
+            'username': mechanic.get('username'),
+            'email': mechanic.get('email'),
+            'phone': mechanic.get('phone'),
+            'address': mechanic.get('address'),
+            'garage_name': mechanic.get('garage_name'),
+            'active_mech': mechanic.get('active_mech', False),
+            'available': mechanic.get('available', False),
+            'user_history': user_history
+        }
+
+        print(f"🔍 [DEBUG] Final profile data: {profile_data}")
+
+        return JsonResponse({
+            'status': 'success',
+            'data': profile_data
+        })
+
+    except Exception as e:
+        print(f"❌ [DEBUG] Error in get_mechanic_profile: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def test_user_history(request):
+    """Test endpoint to directly query user_history from auth_mech collection"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'GET method required'}, status=405)
+
+    try:
+        # Get database connection
+        db = connection.cursor().db_conn
+        
+        # Query all mechanics with user_history
+        mechanics_with_history = list(db['auth_mech'].find(
+            {'user_history': {'$exists': True, '$ne': []}},
+            {'username': 1, 'garage_name': 1, 'user_history': 1}
+        ))
+        
+        # Transform ObjectIds to strings
+        for mech in mechanics_with_history:
+            mech['_id'] = str(mech['_id'])
+        
+        return JsonResponse({
+            'status': 'success',
+            'count': len(mechanics_with_history),
+            'mechanics': mechanics_with_history
+        })
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

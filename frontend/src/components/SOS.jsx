@@ -98,27 +98,22 @@ const handleCallPress = async (contact) => {
     const waNumber = normalizeForWhatsApp();
     if (!waNumber) return;
 
-    Geolocation.getCurrentPosition(
-      async pos => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          const payload = {
-            to: waNumber.replace(/\s+/g, ''),
-            username: currentUser?.username || 'MechaFix User',
-            lat: latitude,
-            lon: longitude,
-          };
-          const res = await API.post('users/sos/whatsapp/', payload);
-          if (res.data?.status === 'fallback' && res.data?.click_to_chat) {
-            Linking.openURL(res.data.click_to_chat);
-          }
-        } catch (e) {
-          Alert.alert('Notice', 'Could not send WhatsApp. You can try WhatsApp Chat manually.');
-        }
-      },
-      err => console.warn('Location error:', err?.message),
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
-    );
+    // Try WhatsApp first, fallback to call
+    try {
+      const whatsappUrl = `whatsapp://send?phone=${waNumber}&text=${encodeURIComponent('Emergency contact request')}`;
+      const canOpen = await Linking.canOpenURL(whatsappUrl);
+      
+      if (canOpen) {
+        await Linking.openURL(whatsappUrl);
+      } else {
+        // Fallback to web WhatsApp
+        const webWhatsappUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent('Emergency contact request')}`;
+        await Linking.openURL(webWhatsappUrl);
+      }
+    } catch (error) {
+      console.error('Error opening WhatsApp:', error);
+      // If WhatsApp fails, just continue with the call
+    }
   }
 };
 
@@ -216,7 +211,7 @@ const handleCallPress = async (contact) => {
   };
 
   // SOS Button Handler
-  const handleSOS = () => {
+  const handleSOS = async () => {
     setShowSOSMessage(true);
     ringAnim.setValue(0);
     Animated.loop(
@@ -228,6 +223,85 @@ const handleCallPress = async (contact) => {
       }),
       { iterations: 4 }
     ).start();
+    
+    // Send WhatsApp messages to user emergency contacts only
+    try {
+      // Get current location
+      Geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          // Filter only user-added emergency contacts (not static ones like 100, 101, 108)
+          const userContacts = contacts.filter(contact => contact.type === 'user');
+          
+          if (userContacts.length > 0) {
+            let messagesSent = 0;
+            
+            // Send SOS to each user emergency contact
+            for (const contact of userContacts) {
+              if (contact.number && contact.number.trim()) {
+                try {
+                  const payload = {
+                    to: contact.number,
+                    username: currentUser?.username || 'MechaFix User',
+                    lat: latitude,
+                    lon: longitude,
+                  };
+                  
+                  const response = await API.post('users/sos/whatsapp/', payload);
+                  
+                  if (response.data?.status === 'sent') {
+                    messagesSent++;
+                  } else if (response.data?.status === 'fallback') {
+                    // Open WhatsApp web fallback
+                    const clickToChat = response.data.click_to_chat;
+                    if (clickToChat) {
+                      await Linking.openURL(clickToChat);
+                      messagesSent++;
+                    }
+                  }
+                } catch (error) {
+                  console.error(`Error sending SOS to ${contact.name}:`, error);
+                }
+              }
+            }
+            
+            if (messagesSent > 0) {
+              Alert.alert(
+                'SOS Alert Sent!',
+                `Emergency messages sent to ${messagesSent} contact(s) via WhatsApp.`,
+                [{ text: 'OK' }]
+              );
+            } else {
+              Alert.alert(
+                'SOS Failed',
+                'Could not send emergency messages. Please try calling directly.',
+                [{ text: 'OK' }]
+              );
+            }
+          } else {
+            Alert.alert(
+              'No Emergency Contacts',
+              'Please add emergency contacts first. You can add them below.',
+              [{ text: 'OK' }]
+            );
+          }
+        },
+        (error) => {
+          console.error('Location error:', error);
+          Alert.alert(
+            'Location Error',
+            'Could not get your location. Please enable location services.',
+            [{ text: 'OK' }]
+          );
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+      );
+    } catch (error) {
+      console.error('Error sending SOS messages:', error);
+      Alert.alert('Error', 'Failed to send emergency messages. Please try calling directly.');
+    }
+    
     setTimeout(() => {
       setShowSOSMessage(false);
       ringAnim.stopAnimation();

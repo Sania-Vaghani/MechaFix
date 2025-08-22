@@ -11,4 +11,11 @@ urlpatterns = [
     path('api/request-detail/<str:request_id>/', views.get_service_request_detail, name='get_service_request_detail'),
     path('service-requests/<str:req_id>/assign-mechanic/', views.assign_mechanic, name='assign_mechanic'),
     path('api/assign-worker/', views.assign_worker, name='assign_worker'),
+    path('api/user-active-request/', views.get_user_active_request, name='get_user_active_request'),
+    path('api/verify-otp-complete/', views.verify_otp_and_complete, name='verify_otp_complete'),
+    path('api/mechanics/', views.get_mechanics_list, name='get_mechanics_list'),
+    path('api/service-requests/today-overview/', views.get_today_overview, name='get_today_overview'),
+    path('api/service-requests/recent/', views.get_recent_requests, name='get_recent_requests'),
+
+    path('api/service-requests/completed/', views.get_completed_requests, name='get_completed_requests'),
 ]

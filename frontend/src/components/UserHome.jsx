@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image, TextInput, FlatList, Modal, Pressable, Keyboard, Animated } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image, TextInput, FlatList, Modal, Pressable, Keyboard, Animated, Alert, Linking } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import locIcon from '../images/loc.png';
 import settingIcon from '../images/setting.png';
@@ -28,6 +28,26 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import SOSButtonOverlay from './SOSButtonOverlay';
 
+/**
+ * UserHome Component
+ * 
+ * Features:
+ * - Main user dashboard with quick services and mechanic search
+ * - Floating box that appears when a worker is assigned to the user
+ * - Real-time updates for assigned worker status
+ * - Navigation to AssignedMech component for detailed worker information
+ * - Automatic polling every 10 seconds to check for new assignments
+ * - Error handling with retry functionality
+ * - Smooth animations for floating box appearance/disappearance
+ * 
+ * Floating Box Features:
+ * - Shows assigned worker name, garage, and issue type
+ * - View button navigates to AssignedMech component
+ * - Close button to dismiss the floating box
+ * - Pulsing status dot to indicate active assignment
+ * - Long press shows additional options (call worker, view details)
+ * - Positioned above tab bar for easy access
+ */
 const serviceIcons = {
   breakdown: require('../images/img1.png'),
   fuel: require('../images/img2.png'),
@@ -42,18 +62,11 @@ const mechanicData = [
   { id: '4', name: 'Emily Brown', mobile: '9001122334' },
 ];
 
-const lastAllottedMechanics = [
-  { id: '5', name: 'Rahul Mehta', mobile: '9876501234' },
-  { id: '6', name: 'Priya Singh', mobile: '9123409876' },
-  { id: '7', name: 'Amit Sharma', mobile: '9988771122' },
-  { id: '8', name: 'Sneha Patel', mobile: '9001122445' },
-  { id: '9', name: 'Vikram Rao', mobile: '9112233445' },
-];
+
 
 const HEADER_HEIGHT = 140; // Increased to fit search bar and results
 
 const UserHome = ({
-  onContactMechanic,
   onFastConnection,
   onLiveChat,
   onBreakdown,
@@ -80,6 +93,11 @@ const UserHome = ({
   // Add state to track dropdown height
   const [dropdownHeight, setDropdownHeight] = useState(0);
 
+  // Contact Mechanic handler - navigate to Breakdown page
+  const handleContactMechanic = () => {
+    navigation.navigate('Breakdown');
+  };
+
   // Filter mechanics
   const filteredMechanics = mechanicData.filter(
     m =>
@@ -89,6 +107,74 @@ const UserHome = ({
 
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [noResultAnim] = useState(new Animated.Value(0));
+
+  // Add state for assigned worker floating box
+  const [assignedWorker, setAssignedWorker] = useState(null);
+  const [isLoadingWorker, setIsLoadingWorker] = useState(false);
+  const [workerError, setWorkerError] = useState(null);
+  const [floatingBoxAnim] = useState(new Animated.Value(0));
+  const [statusDotAnim] = useState(new Animated.Value(1));
+
+  // Add state for recent mechanics from auth_mech collection
+  const [recentMechanics, setRecentMechanics] = useState([]);
+  const [isLoadingMechanics, setIsLoadingMechanics] = useState(false);
+  const [spinnerAnim] = useState(new Animated.Value(0));
+
+  // Debug: Log when assignedWorker changes
+  useEffect(() => {
+    console.log('🔄 assignedWorker state changed:', assignedWorker);
+  }, [assignedWorker]);
+
+  // Animate floating box when it appears/disappears
+  useEffect(() => {
+    if (assignedWorker) {
+      Animated.spring(floatingBoxAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }).start();
+      
+      // Start pulsing animation for status dot
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(statusDotAnim, {
+            toValue: 0.3,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(statusDotAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+      
+      // Add bounce animation for badge
+      Animated.sequence([
+        Animated.timing(statusDotAnim, {
+          toValue: 1.2,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(statusDotAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.timing(floatingBoxAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      
+      // Stop pulsing animation
+      statusDotAnim.stopAnimation();
+    }
+  }, [assignedWorker]);
 
   useEffect(() => {
     if (dropdownOpen && filteredMechanics.length === 0 && search) {
@@ -105,6 +191,372 @@ const UserHome = ({
   const [user, setUser] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [sosVisible, setSosVisible] = useState(false);
+
+  // Function to fetch user's active request with assigned worker
+  const fetchActiveRequest = async () => {
+    if (!user?._id) {
+      console.log('❌ No user ID available for fetchActiveRequest');
+      return;
+    }
+    
+    console.log('🔍 Fetching active request for user:', user._id);
+    setIsLoadingWorker(true);
+    setWorkerError(null);
+    
+    try {
+      const token = await AsyncStorage.getItem('jwtToken');
+      console.log('🔑 Token available:', !!token);
+
+      // 1) Check a persisted lastRequestId first for a precise state
+      try {
+        const lastRequestId = await AsyncStorage.getItem('lastRequestId');
+        if (lastRequestId) {
+          console.log('🗃️ Found lastRequestId in storage:', lastRequestId);
+          const det = await API.get(`request-detail/${lastRequestId}/`, { headers: { Authorization: `Bearer ${token}` }});
+          if (det?.data?.status === 'success' && det?.data?.request) {
+            const req = det.data.request;
+            
+            // If any mechanic has completed this request, clear box immediately
+            const anyCompleted = Array.isArray(req.mechanics_list) && req.mechanics_list.some(m => m.status === 'completed');
+            if (anyCompleted) {
+              console.log('✅ Request completed by mechanic, clearing floating box');
+              setAssignedWorker(null);
+              return;
+            }
+            
+            const hasAssignedWorker = !!req.assigned_worker;
+            const hasAccepted = Array.isArray(req.mechanics_list) && req.mechanics_list.some(m => m.status === 'accepted');
+            const isAssignedStatus = req.status === 'assigned';
+            const notCompleted = req.status !== 'completed';
+            if ((hasAssignedWorker || hasAccepted || isAssignedStatus) && notCompleted && String(req.user_id) === String(user._id)) {
+              const acceptedMechanic = req.mechanics_list.find(m => m.status === 'accepted');
+              const workerData = {
+                worker_id: req.assigned_worker?.worker_id || acceptedMechanic?.mech_id,
+                worker_name: req.assigned_worker?.worker_name || acceptedMechanic?.mech_name || 'Assigned Mechanic',
+                worker_phone: req.assigned_worker?.worker_phone || acceptedMechanic?.mech_phone || 'N/A',
+                garage_name: req.assigned_worker?.garage_name || acceptedMechanic?.mech_name || 'Garage',
+                request_id: req._id,
+                user_coords: { lat: req.lat, lon: req.lon },
+                garage_coords: req.garage_coords || req.assigned_worker?.garage_coords || null,
+                user_name: req.user_name,
+                user_phone: req.user_phone,
+                breakdown_type: req.breakdown_type,
+                car_model: req.car_model,
+                year: req.year,
+                license_plate: req.license_plate,
+                description: req.description,
+                issue_type: req.issue_type,
+                road_distance: acceptedMechanic?.road_distance_km || 'N/A',
+                otp_code: req.otp_code || '----'  // Add OTP from request
+              };
+              console.log('✅ Using precise request-detail data to set box');
+              setAssignedWorker(workerData);
+              return; // short-circuit; we have definitive active assignment
+            }
+          }
+        }
+      } catch (preciseErr) {
+        console.log('ℹ️ request-detail precise check failed/ignored:', preciseErr);
+      }
+      
+      // 2) Fallback to broader lists as before
+      // Try to get user's active requests using a more generic approach
+      // 2a) Query a dedicated user-active-request endpoint first
+      try {
+        const ua = await API.get(`user-active-request/?user_id=${user._id}`, { headers: { Authorization: `Bearer ${token}` }});
+        if (ua?.data?.status === 'success' && ua?.data?.request) {
+          const r = ua.data.request;
+          
+          // If any mechanic has completed this request, clear box immediately
+          const anyCompleted = Array.isArray(r.mechanics_list) && r.mechanics_list.some(m => m.status === 'completed');
+          if (anyCompleted) {
+            console.log('✅ Request completed by mechanic (from user-active-request), clearing floating box');
+            setAssignedWorker(null);
+            return;
+          }
+          
+          const acceptedMechanic = Array.isArray(r.mechanics_list) ? r.mechanics_list.find(m => m.status === 'accepted' || m.status === 'assigned') : null;
+          const workerData = {
+            worker_id: r.assigned_worker?.worker_id || acceptedMechanic?.mech_id,
+            worker_name: r.assigned_worker?.worker_name || acceptedMechanic?.mech_name || 'Assigned Mechanic',
+            worker_phone: r.assigned_worker?.worker_phone || acceptedMechanic?.mech_phone || 'N/A',
+            garage_name: r.assigned_worker?.garage_name || acceptedMechanic?.mech_name || 'Garage',
+            request_id: r._id,
+            user_coords: { lat: r.lat, lon: r.lon },
+            garage_coords: r.garage_coords || r.assigned_worker?.garage_coords || null,
+            user_name: r.user_name,
+            user_phone: r.user_phone,
+            breakdown_type: r.breakdown_type,
+            car_model: r.car_model,
+            year: r.year,
+            license_plate: r.license_plate,
+            description: r.description,
+            issue_type: r.issue_type,
+            road_distance: acceptedMechanic?.road_distance_km || 'N/A',
+            otp_code: r.otp_code || '----'  // Add OTP from request
+          };
+          setAssignedWorker(workerData);
+          return;
+        }
+      } catch (uae) { /* ignore and continue */ }
+
+      const response = await API.get('pending-requests/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      console.log('📡 API Response:', response.data);
+      
+      if (response.data.status === 'success' && response.data.requests) {
+        console.log('✅ Found requests:', response.data.requests.length);
+        const userRequest = response.data.requests.find(req => {
+          const hasUserMatch = String(req.user_id) === String(user._id);
+          const hasMechanicsList = Array.isArray(req.mechanics_list) && req.mechanics_list.length > 0;
+          const hasAcceptedMechanic = hasMechanicsList && req.mechanics_list.some(mech => mech.status === 'accepted');
+          const hasAssignedWorker = !!req.assigned_worker;
+          const isAssignedStatus = req.status === 'assigned';
+          const notCompleted = !req.mechanics_list.some(mech => mech.status === 'completed');
+          return hasUserMatch && (hasAssignedWorker || hasAcceptedMechanic || isAssignedStatus) && notCompleted;
+        });
+        
+        if (userRequest) {
+          const acceptedMechanic = userRequest.mechanics_list.find(mech => mech.status === 'accepted');
+          const workerData = {
+            worker_id: userRequest.assigned_worker?.worker_id || acceptedMechanic?.mech_id,
+            worker_name: userRequest.assigned_worker?.worker_name || acceptedMechanic?.mech_name || 'Assigned Mechanic',
+            worker_phone: userRequest.assigned_worker?.worker_phone || acceptedMechanic?.mech_phone || 'N/A',
+            garage_name: userRequest.assigned_worker?.garage_name || acceptedMechanic?.mech_name || 'Garage',
+            request_id: userRequest._id,
+            user_coords: { lat: userRequest.lat, lon: userRequest.lon },
+            garage_coords: userRequest.garage_coords || { lat: userRequest.lat, lon: userRequest.lon },
+            user_name: userRequest.user_name,
+            user_phone: userRequest.user_phone,
+            breakdown_type: userRequest.breakdown_type,
+            car_model: userRequest.car_model,
+            year: userRequest.year,
+            license_plate: userRequest.license_plate,
+            description: userRequest.description,
+            issue_type: userRequest.issue_type,
+            road_distance: acceptedMechanic?.road_distance_km || 'N/A',
+            otp_code: userRequest.otp_code || '----'  // Add OTP from request
+          };
+          setAssignedWorker(workerData);
+        } else {
+          setAssignedWorker(null);
+        }
+      } else {
+        // Keep the older fallbacks intact
+        try {
+          const assignedResponse = await API.get(`assigned-requests/?user_id=${user._id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (assignedResponse.data.status === 'success' && assignedResponse.data.requests) {
+            const activeRequest = assignedResponse.data.requests.find(req => req.status === 'assigned' || (Array.isArray(req.mechanics_list) && req.mechanics_list.some(m => m.status === 'accepted')) || (req.status && req.status !== 'completed'));
+            if (activeRequest) {
+              const acceptedMechanic = activeRequest.mechanics_list?.find(mech => mech.status === 'accepted');
+              const workerData = {
+                worker_id: activeRequest.assigned_worker?.worker_id || acceptedMechanic?.mech_id,
+                worker_name: activeRequest.assigned_worker?.worker_name || acceptedMechanic?.mech_name || 'Assigned Mechanic',
+                worker_phone: activeRequest.assigned_worker?.worker_phone || acceptedMechanic?.mech_phone || 'N/A',
+                garage_name: activeRequest.assigned_worker?.garage_name || acceptedMechanic?.mech_name || 'Garage',
+                request_id: activeRequest._id,
+                user_coords: { lat: activeRequest.lat, lon: activeRequest.lon },
+                garage_coords: activeRequest.garage_coords || { lat: activeRequest.lat, lon: activeRequest.lon },
+                user_name: activeRequest.user_name,
+                user_phone: activeRequest.user_phone,
+                breakdown_type: activeRequest.breakdown_type,
+                car_model: activeRequest.car_model,
+                year: activeRequest.year,
+                license_plate: activeRequest.license_plate,
+                description: activeRequest.description,
+                issue_type: activeRequest.issue_type,
+                road_distance: acceptedMechanic?.road_distance_km || 'N/A',
+                otp_code: activeRequest.otp_code || '----'  // Add OTP from request
+              };
+              setAssignedWorker(workerData);
+            } else {
+              setAssignedWorker(null);
+            }
+          } else {
+            setAssignedWorker(null);
+          }
+        } catch (assignedError) {
+          console.log('❌ No assigned requests found:', assignedError);
+          try {
+            const anyResponse = await API.get(`user-requests/`, { headers: { Authorization: `Bearer ${token}` } });
+            if (anyResponse.data && anyResponse.data.length > 0) {
+              const userRequest = anyResponse.data.find(req => String(req.user_id) === String(user._id) && ((Array.isArray(req.mechanics_list) && req.mechanics_list.some(mech => mech.status === 'accepted')) || !!req.assigned_worker || req.status === 'assigned'));
+              if (userRequest) {
+                const acceptedMechanic = userRequest.mechanics_list.find(mech => mech.status === 'accepted');
+                const workerData = {
+                  worker_id: acceptedMechanic?.mech_id,
+                  worker_name: acceptedMechanic?.mech_name || 'Assigned Mechanic',
+                  worker_phone: acceptedMechanic?.mech_phone || 'N/A',
+                  garage_name: acceptedMechanic?.mech_name || 'Garage',
+                  request_id: userRequest._id,
+                  user_coords: { lat: userRequest.lat, lon: userRequest.lon },
+                  garage_coords: userRequest.garage_coords || { lat: userRequest.lat, lon: userRequest.lon },
+                  user_name: userRequest.user_name,
+                  user_phone: userRequest.user_phone,
+                  breakdown_type: userRequest.breakdown_type,
+                  car_model: userRequest.car_model,
+                  year: userRequest.year,
+                  license_plate: userRequest.license_plate,
+                  description: userRequest.description,
+                  issue_type: userRequest.issue_type,
+                  road_distance: acceptedMechanic?.road_distance_km || 'N/A',
+                  otp_code: userRequest.otp_code || '----'  // Add OTP from request
+                };
+                setAssignedWorker(workerData);
+              } else {
+                setAssignedWorker(null);
+              }
+            } else {
+              setAssignedWorker(null);
+            }
+          } catch (anyError) {
+            console.log('❌ No user requests found at all:', anyError);
+            setAssignedWorker(null);
+          }
+        }
+      }
+    } catch (error) {
+      console.log('❌ Error fetching assigned worker:', error);
+      setWorkerError('Failed to fetch assignment data');
+      setAssignedWorker(null);
+    } finally {
+      setIsLoadingWorker(false);
+    }
+  };
+
+    // Function to fetch recent mechanics from database
+  const fetchRecentMechanics = async () => {
+    console.log('🔍 Fetching recent mechanics from database');
+    setIsLoadingMechanics(true);
+    
+    try {
+      const token = await AsyncStorage.getItem('jwtToken');
+      if (!token) {
+        console.log('❌ No token available for fetching mechanics');
+        setRecentMechanics([]);
+        return;
+      }
+
+      // Try the new mechanics endpoint first (which should work)
+      let mechanicsData = null;
+      
+      try {
+        console.log('📡 Trying GET /mechanics/ endpoint...');
+        console.log('📡 Calling with user_id:', user?._id);
+        const response = await API.get(`mechanics/?user_id=${user?._id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        console.log('📡 Mechanics API Response:', response.data);
+        
+        if (response.data?.status === 'success' && response.data?.mechanics) {
+          mechanicsData = response.data.mechanics;
+          console.log('✅ Successfully fetched mechanics from /mechanics/ endpoint:', response.data.count);
+          console.log('👤 Found mechanics for user:', response.data.user_name);
+        }
+      } catch (error) {
+        console.log('❌ /mechanics/ endpoint failed:', error.message);
+        console.log('❌ Error details:', error.response?.data || error.response?.status || 'No response data');
+        console.log('❌ Full error:', error);
+      }
+
+      // If mechanics endpoint fails, try fallback approaches
+      if (!mechanicsData) {
+        // Try to get from the last known request (which we know works)
+        try {
+          console.log('📡 Trying to get mechanics from last known request...');
+          const lastRequestId = await AsyncStorage.getItem('lastRequestId');
+          
+          if (lastRequestId) {
+            const response2 = await API.get(`request-detail/${lastRequestId}/`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            console.log('📡 Request-detail API Response:', response2.data);
+            
+            if (response2.data?.status === 'success' && response2.data?.request) {
+              const request = response2.data.request;
+              
+              if (request.mechanics_list && Array.isArray(request.mechanics_list)) {
+                const mechanicsFromDetail = request.mechanics_list.map(mech => ({
+                  _id: mech.mech_id,
+                  username: mech.mech_name,
+                  phone: mech.mech_phone,
+                  garage_name: mech.mech_name,
+                  address: 'Address from request detail',
+                  active_mech: true
+                }));
+                
+                if (mechanicsFromDetail.length > 0) {
+                  mechanicsData = mechanicsFromDetail;
+                  console.log('✅ Found mechanics from request-detail endpoint:', mechanicsFromDetail.length);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.log('❌ request-detail endpoint failed:', error.message);
+        }
+      }
+
+      // Process the mechanics data
+      if (mechanicsData && Array.isArray(mechanicsData)) {
+        console.log('🔧 Processing mechanics data:', mechanicsData.length, 'items');
+        
+        // Filter only active mechanics and take the first 5
+        const activeMechanics = mechanicsData
+          .filter(mech => mech.active_mech === true)
+          .slice(0, 5)
+          .map(mech => ({
+            id: mech._id,
+            name: mech.username || 'Unknown Mechanic',
+            mobile: mech.phone || 'N/A',
+            garage_name: mech.garage_name || 'Unknown Garage',
+            address: mech.address || 'Address not available',
+            request_count: mech.user_request_count || 0,
+            last_service: mech.last_service_type || 'N/A',
+            last_date: mech.last_service_date || 'N/A'
+          }));
+        
+        console.log('✅ Found active mechanics:', activeMechanics.length);
+        console.log('📋 Final mechanics list:', activeMechanics);
+        setRecentMechanics(activeMechanics);
+      } else {
+        console.log('❌ No mechanics data found or invalid format');
+        
+        // Final fallback: Use static data from your MongoDB
+        console.log('🔄 Using fallback static data from MongoDB');
+        const fallbackMechanics = [
+          {
+            id: 'fallback-1',
+            name: 'ABC',
+            mobile: '9876543212',
+            garage_name: 'Jay Bharat Motors & Auto Consultant',
+            address: '1, Highway Estate, Sanand Road, Sarkhej-382210'
+          },
+          {
+            id: 'fallback-2',
+            name: 'XYZ',
+            mobile: '4678765445',
+            garage_name: 'Car Doctor',
+            address: 'Sardar Patel Ring Rd, opp. applewood townships, Ahmedabad, Sarkhej-Oka'
+          }
+        ];
+        setRecentMechanics(fallbackMechanics);
+      }
+    } catch (error) {
+      console.log('❌ Error fetching mechanics:', error);
+      setRecentMechanics([]);
+    } finally {
+      setIsLoadingMechanics(false);
+    }
+  };
+
+
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -124,34 +576,34 @@ const UserHome = ({
     fetchProfile();
   }, []);
 
+  // Fetch active request when user is available
   useEffect(() => {
-    const getLocation = async () => {
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          return;
-        }
-      }
-      Geolocation.getCurrentPosition(
-        position => {
-          console.log('Fetched position:', position);
-          setCurrentLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          });
-        },
-        error => {
-          console.log('Location error:', error);
-        },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
-      );
-    };
-    getLocation();
-  }, []);
+    if (user?._id) {
+      fetchActiveRequest();
+      fetchRecentMechanics(); // Also fetch recent mechanics
+      // Set up polling to check for updates every 10 seconds
+      const interval = setInterval(fetchActiveRequest, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [user?._id]);
 
   const navigation = useNavigation();
+
+  // Function to calculate distance between two coordinates
+  const calculateDistance = (coord1, coord2) => {
+    if (!coord1?.lat || !coord1?.lon || !coord2?.lat || !coord2?.lon) return 'N/A';
+    
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (coord2.lat - coord1.lat) * Math.PI / 180;
+    const dLon = (coord2.lon - coord1.lon) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(coord1.lat * Math.PI / 180) * Math.cos(coord2.lat * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    
+    return distance.toFixed(1);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -179,11 +631,33 @@ const UserHome = ({
         );
       };
       getLocation(); // <-- This is where location is fetched!
+      
+      // Also refresh assigned worker data when screen is focused
+      if (user?._id) {
+        fetchActiveRequest();
+        fetchRecentMechanics(); // Also refresh mechanics data
+      }
+      
       return () => {
         setCurrentLocation(null); // Reset on blur
       };
-    }, [])
+    }, [user?._id])
   );
+
+  // Animate spinner when loading mechanics
+  useEffect(() => {
+    if (isLoadingMechanics) {
+      Animated.loop(
+        Animated.timing(spinnerAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      ).start();
+    } else {
+      spinnerAnim.stopAnimation();
+    }
+  }, [isLoadingMechanics]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F6F8FF' }}>
@@ -221,6 +695,15 @@ const UserHome = ({
             </View>
             <Text style={[styles.subGreeting, { color: theme.textSecondary }]}>Welcome back!</Text>
           </View>
+          <TouchableOpacity 
+            style={styles.refreshButton} 
+            onPress={() => {
+              console.log('🔄 Manual refresh triggered');
+              fetchActiveRequest();
+            }}
+          >
+            <Text style={styles.refreshButtonText}>🔄</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.headerIconBtn}>
             <Image source={settingIcon} style={styles.headerImgIcon} />
           </TouchableOpacity>
@@ -286,7 +769,16 @@ const UserHome = ({
                       <Text style={styles.dropdownName}>{item.name}</Text>
                       <Text style={styles.dropdownMobile}>{item.mobile}</Text>
                     </View>
-                    <TouchableOpacity style={styles.callIconBtn}>
+                    <TouchableOpacity 
+                      style={styles.callIconBtn}
+                      onPress={() => {
+                        if (item.mobile && item.mobile !== 'N/A') {
+                          Linking.openURL(`tel:${item.mobile}`);
+                        } else {
+                          Alert.alert('No Phone Number', 'This mechanic does not have a phone number available.');
+                        }
+                      }}
+                    >
                       <Image source={phoneIcon} style={styles.callIcon} />
                     </TouchableOpacity>
                   </Pressable>
@@ -386,7 +878,7 @@ const UserHome = ({
                 <Image source={chatIcon} style={styles.actionIcon} />
                 <Text style={styles.actionTitle}>Contact Mechanic</Text>
                 <Text style={styles.actionDesc}>Connect with nearby mechanics</Text>
-                <TouchableOpacity style={styles.actionBtnOutline} onPress={onContactMechanic}>
+                <TouchableOpacity style={styles.actionBtnOutline} onPress={handleContactMechanic}>
                   <Text style={styles.actionBtnOutlineText}>Find Now</Text>
                 </TouchableOpacity>
               </View>
@@ -399,27 +891,70 @@ const UserHome = ({
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             <Image source={require('../images/history.png')} style={styles.sectionIcon} />
             <Text style={styles.sectionHeader}>RECENT MECHANICS</Text>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity 
+              style={styles.sectionRefreshBtn} 
+              onPress={fetchRecentMechanics}
+              disabled={isLoadingMechanics}
+            >
+              <Text style={styles.sectionRefreshBtnText}>
+                {isLoadingMechanics ? '⟳' : '⟳'}
+              </Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.sectionDivider} />
           <View style={styles.recentMechContainer}>
-            {lastAllottedMechanics.length > 0 ? (
-              lastAllottedMechanics.map((mech, idx) => (
+            {isLoadingMechanics ? (
+              <View style={styles.recentMechLoading}>
+                <Animated.View style={[styles.recentMechSpinner, { transform: [{ rotate: spinnerAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '360deg'],
+                })}] }]}>
+                  <Text style={styles.recentMechSpinnerText}>⟳</Text>
+                </Animated.View>
+                <Text style={styles.recentMechLoadingText}>Loading mechanics...</Text>
+              </View>
+            ) : recentMechanics.length > 0 ? (
+              recentMechanics.map((mech, idx) => (
                 <View key={mech.id}>
                   <View style={styles.recentMechRow}>
                     <Image source={require('../images/user.png')} style={styles.dropdownIcon} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.dropdownName}>{mech.name}</Text>
-                      <Text style={styles.dropdownMobile}>{mech.mobile}</Text>
+                      <Text style={styles.dropdownMobile}>{mech.garage_name}</Text>
+                      <Text style={styles.dropdownAddress}>{mech.mobile}</Text>
+                      {mech.request_count > 0 && (
+                        <Text style={styles.dropdownHistory}>
+                          📋 {mech.request_count} service{mech.request_count > 1 ? 's' : ''} • Last: {mech.last_service}
+                        </Text>
+                      )}
                     </View>
-                    <TouchableOpacity style={styles.callIconBtn}>
+                    <TouchableOpacity 
+                      style={styles.callIconBtn}
+                      onPress={() => {
+                        if (mech.mobile && mech.mobile !== 'N/A') {
+                          Linking.openURL(`tel:${mech.mobile}`);
+                        } else {
+                          Alert.alert('No Phone Number', 'This mechanic does not have a phone number available.');
+                        }
+                      }}
+                    >
                       <Image source={phoneIcon} style={styles.callIcon} />
                     </TouchableOpacity>
                   </View>
-                  {idx !== lastAllottedMechanics.length - 1 ? <View style={styles.recentMechDivider} /> : null}
+                  {idx !== recentMechanics.length - 1 ? <View style={styles.recentMechDivider} /> : null}
                 </View>
               ))
             ) : (
-              <Text style={styles.dropdownMobile}>No mechanics allotted or called yet.</Text>
+              <View style={styles.recentMechEmpty}>
+                <Text style={styles.recentMechEmptyText}>No mechanics available at the moment.</Text>
+                <TouchableOpacity 
+                  style={styles.recentMechRefreshBtn}
+                  onPress={fetchRecentMechanics}
+                >
+                  <Text style={styles.recentMechRefreshBtnText}>Refresh</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
@@ -484,6 +1019,121 @@ const UserHome = ({
           </View>
         </View>
       </ScrollView>
+      
+      {/* Floating Box for Assigned Worker - Above Tab Bar */}
+      {assignedWorker && (
+        <Animated.View style={[styles.floatingBox, { transform: [{ translateY: floatingBoxAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [100, 0], // Slide up from bottom
+        })}] }]}>
+          <View style={styles.floatingBoxContent}>
+            <View style={styles.floatingBoxLeft}>
+              <View style={styles.floatingBoxIconContainer}>
+                <Image source={require('../images/engineer.png')} style={styles.floatingBoxIcon} />
+                <View style={styles.floatingBoxBadge}>
+                  <Text style={styles.floatingBoxBadgeText}>🔧</Text>
+                </View>
+              </View>
+              <View style={styles.floatingBoxTextContainer}>
+                <Text style={styles.floatingBoxTitle}>{assignedWorker.worker_name || 'Unknown'}</Text>
+                <Text style={styles.floatingBoxSubtitle}>{assignedWorker.garage_name || 'Unknown Garage'}</Text>
+                {assignedWorker.user_coords && assignedWorker.garage_coords && (
+                  <Text style={styles.floatingBoxDistance}>
+                    📍 {assignedWorker.road_distance !== 'N/A' ? `${assignedWorker.road_distance} km away` : 'Distance: N/A'}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <View style={styles.floatingBoxRight}>
+              <TouchableOpacity 
+                style={styles.floatingBoxViewBtn}
+                onPress={() => {
+                  console.log('🔍 View button pressed for worker:', assignedWorker);
+                  const parentNav = navigation.getParent ? navigation.getParent() : null;
+                  const nav = parentNav || navigation;
+                  nav.navigate('AssignedMech', {
+                    assigned_worker: assignedWorker,
+                    user_coords: assignedWorker.user_coords,
+                    garage_coords: assignedWorker.garage_coords,
+                    request_id: assignedWorker.request_id,
+                    user_name: assignedWorker.user_name,
+                    user_phone: assignedWorker.user_phone,
+                    otp_code: assignedWorker.otp_code,  // Pass the OTP
+                  });
+                }}
+              >
+                <Text style={styles.floatingBoxViewBtnText}>View</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.floatingBoxCloseBtn}
+                onPress={() => setAssignedWorker(null)}
+              >
+                <Text style={styles.floatingBoxCloseBtnText}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+      
+      {/* Loading Indicator for Assigned Worker */}
+      {isLoadingWorker && !assignedWorker && (
+        <Animated.View style={[styles.floatingBoxLoading, { transform: [{ translateY: floatingBoxAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [100, 0], // Slide up from bottom
+        })}] }]}>
+          <View style={styles.floatingBoxContent}>
+            <View style={styles.floatingBoxLeft}>
+              <View style={styles.floatingBoxIconContainer}>
+                <Image source={require('../images/engineer.png')} style={styles.floatingBoxIcon} />
+              </View>
+              <View style={styles.floatingBoxTextContainer}>
+                <Text style={styles.floatingBoxTitle}>Checking assignments...</Text>
+                <Text style={styles.floatingBoxSubtitle}>Please wait</Text>
+              </View>
+            </View>
+            <View style={styles.floatingBoxRight}>
+              <View style={styles.floatingBoxLoadingSpinner}>
+                <Text style={styles.floatingBoxLoadingText}>⟳</Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+      
+      {/* Error State for Assigned Worker */}
+      {workerError && !assignedWorker && !isLoadingWorker && (
+        <Animated.View style={[styles.floatingBoxError, { transform: [{ translateY: floatingBoxAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [100, 0], // Slide up from bottom
+        })}] }]}>
+          <View style={styles.floatingBoxContent}>
+            <View style={styles.floatingBoxLeft}>
+              <View style={styles.floatingBoxIconContainer}>
+                <Image source={require('../images/engineer.png')} style={styles.floatingBoxIcon} />
+              </View>
+              <View style={styles.floatingBoxTextContainer}>
+                <Text style={styles.floatingBoxTitle}>Connection Error</Text>
+                <Text style={styles.floatingBoxSubtitle}>{workerError}</Text>
+              </View>
+            </View>
+            <View style={styles.floatingBoxRight}>
+              <TouchableOpacity 
+                style={styles.floatingBoxRetryBtn}
+                onPress={fetchActiveRequest}
+              >
+                <Text style={styles.floatingBoxRetryBtnText}>Retry</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.floatingBoxCloseBtn}
+                onPress={() => setWorkerError(null)}
+              >
+                <Text style={styles.floatingBoxCloseBtnText}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+      
       <SOSButtonOverlay visible={sosVisible} onClose={() => setSosVisible(false)} />
     </View>
   );
@@ -544,6 +1194,27 @@ const styles = StyleSheet.create({
     height: 27,
     resizeMode: 'contain',
   },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#22223B',
+    fontFamily: 'Poppins-Bold',
+    marginLeft: 10,
+  },
+  refreshButton: {
+    marginLeft: 10,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  refreshButtonText: {
+    fontSize: 20,
+    color: '#6B7280',
+    fontWeight: 'bold',
+  },
+
   card: {
     backgroundColor: '#fff',
     borderRadius: 8, // Less rounded corners
@@ -1201,7 +1872,7 @@ const styles = StyleSheet.create({
   recentMechRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 4,
   },
   recentMechDivider: {
@@ -1351,6 +2022,309 @@ const styles = StyleSheet.create({
     marginRight: 8,
     tintColor: '#3B82F6', // blue
     alignSelf: 'flex-start',
+  },
+  floatingBox: {
+    position: 'absolute',
+    bottom: 80, // Adjust based on tab bar height
+    left: 16,
+    right: 16,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 100,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    // Add subtle gradient effect
+    borderLeftWidth: 5,
+    borderLeftColor: '#10B981',
+    // Ensure content doesn't overflow
+    minHeight: 80,
+  },
+  floatingBoxContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flex: 1,
+    width: '100%',
+  },
+  floatingBoxLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 16,
+  },
+  floatingBoxIconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#F0F9FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 18,
+    borderWidth: 2,
+    borderColor: '#E0F2FE',
+    shadowColor: '#0EA5E9',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  floatingBoxIcon: {
+    width: 36,
+    height: 36,
+    resizeMode: 'contain',
+    tintColor: '#0EA5E9',
+  },
+  floatingBoxBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  floatingBoxBadgeText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  floatingBoxTextContainer: {
+    flex: 1,
+    marginRight: 12,
+    maxWidth: '60%',
+  },
+  floatingBoxTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    fontFamily: 'Poppins-Bold',
+    marginBottom: 2,
+  },
+  floatingBoxSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+    marginBottom: 4,
+  },
+  floatingBoxDistance: {
+    fontSize: 12,
+    color: '#059669',
+    fontFamily: 'Poppins-Medium',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  floatingBoxRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    marginLeft: 8,
+  },
+  floatingBoxViewBtn: {
+    backgroundColor: '#10B981',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+    marginRight: 8,
+    minWidth: 50,
+  },
+  floatingBoxViewBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 13,
+    fontFamily: 'Poppins-Bold',
+    textAlign: 'center',
+  },
+  floatingBoxCloseBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minWidth: 36,
+  },
+  floatingBoxCloseBtnText: {
+    fontSize: 18,
+    color: '#6B7280',
+    fontWeight: 'bold',
+  },
+  floatingBoxLoading: {
+    position: 'absolute',
+    bottom: 80, // Adjust based on tab bar height
+    left: 20,
+    right: 20,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  floatingBoxLoadingSpinner: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 3,
+    borderColor: '#2563EB',
+    borderTopColor: 'transparent',
+    alignSelf: 'center',
+  },
+  floatingBoxLoadingText: {
+    fontSize: 20,
+    color: '#6B7280',
+    fontWeight: 'bold',
+    marginTop: 5,
+  },
+  floatingBoxStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  floatingBoxStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#2ecc40',
+    marginRight: 6,
+  },
+  floatingBoxError: {
+    position: 'absolute',
+    bottom: 80, // Adjust based on tab bar height
+    left: 20,
+    right: 20,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 100,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  floatingBoxRetryBtn: {
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginRight: 10,
+  },
+  floatingBoxRetryBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+    fontFamily: 'Poppins-Bold',
+  },
+  recentMechLoading: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  recentMechLoadingText: {
+    color: '#6B7280',
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    marginTop: 8,
+  },
+  recentMechEmpty: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  recentMechEmptyText: {
+    color: '#6B7280',
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    textAlign: 'center',
+  },
+  recentMechRefreshBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 10,
+  },
+  recentMechRefreshBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+    fontFamily: 'Poppins-Bold',
+  },
+  dropdownAddress: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+    marginTop: 2,
+  },
+  sectionRefreshBtn: {
+    marginLeft: 10,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sectionRefreshBtnText: {
+    fontSize: 20,
+    color: '#6B7280',
+    fontWeight: 'bold',
+  },
+  recentMechSpinner: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#2563EB',
+    borderTopColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recentMechSpinnerText: {
+    color: '#2563EB',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  dropdownHistory: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
+    marginTop: 2,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image, ActivityIndicator } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import arrowIcon from '../images/arrow.png';
@@ -16,6 +16,7 @@ const FoundMechanic = ({ route, navigation }) => {
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [allLoaded, setAllLoaded] = useState(false);
+  const pollRef = useRef(null);
 
   const loadUser = async () => {
     try {
@@ -137,8 +138,37 @@ const FoundMechanic = ({ route, navigation }) => {
   
       const res = await axios.post("http://10.0.2.2:8000/api/service-request/", payload);
       console.log("✅ Sent request:", res.data);
-  
-      Alert.alert("Request Sent", `Your request to ${mech.mech_name} is now pending until mechanic responds.`);
+      const requestId = res?.data?.request_id;
+      if (requestId) { await AsyncStorage.setItem('lastRequestId', String(requestId)); }
+      Alert.alert("Request Sent", `Your request to ${mech.mech_name} is pending. We'll open the assignment screen when a worker is assigned.`);
+
+      // Start polling this request for assignment
+      if (requestId) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = setInterval(async () => {
+          try {
+            const det = await axios.get(`http://10.0.2.2:8000/api/request-detail/${requestId}/`);
+            if (det?.data?.status === 'success') {
+              const req = det.data.request;
+              if (req?.assigned_worker) {
+                clearInterval(pollRef.current);
+                pollRef.current = null;
+                navigation.navigate('AssignedMech', {
+                  assigned_worker: req.assigned_worker,
+                  user_coords: { lat: req.lat, lon: req.lon },
+                  garage_coords: req.assigned_worker?.garage_coords || null,
+                  road_distance_km: req.mechanics_list?.[0]?.road_distance_km || null,
+                  request_id: req._id,
+                  user_name: req.user_name,
+                  user_phone: req.user_phone,
+                });
+              }
+            }
+          } catch (e) {
+            // ignore transient errors
+          }
+        }, 2000);
+      }
     } catch (err) {
       console.error("❌ Error sending request:", err.response?.data || err.message);
       Alert.alert("Error", "Failed to send request");
@@ -158,6 +188,15 @@ const FoundMechanic = ({ route, navigation }) => {
       setMechanics([]);
     }
   }, [preFetchedMechanics]);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <LinearGradient colors={["#f7cac9", "#f3e7e9", "#a1c4fd"]} style={styles.gradient}>
