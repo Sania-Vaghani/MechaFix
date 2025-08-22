@@ -110,8 +110,6 @@ export default function AssignedMech({ navigation }) {
           <View style={styles.profileInfo}>
             <CustomText style={styles.name}>{mechName}</CustomText>
             <View style={styles.ratingContainer}>
-              <CustomText style={styles.ratingText}>--</CustomText>
-              <Text style={styles.ratingIcon}>★</Text>
             </View>
             <CustomText style={styles.specialization}>{assigned?.garage_name}</CustomText>
             <CustomText style={styles.experience}>Assigned worker</CustomText>

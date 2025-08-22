@@ -27,6 +27,9 @@ import { PermissionsAndroid, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import SOSButtonOverlay from './SOSButtonOverlay';
+import RatingModal from './RatingModal';
+import axios from 'axios';
+import { useRating } from '../context/RatingContext';
 
 /**
  * UserHome Component
@@ -76,6 +79,8 @@ const UserHome = ({
 }) => {
  
   const theme = lightTheme;
+  const navigation = useNavigation();
+  const { showRatingModal, ratingData, closeRatingModal } = useRating();
 
   // Search state
   const [search, setSearch] = useState('');
@@ -98,6 +103,81 @@ const UserHome = ({
     navigation.navigate('Breakdown');
   };
 
+  // Default handlers for quick actions
+  const handleFastConnection = onFastConnection || (() => {
+    console.log('Fast connection pressed');
+    // Add default implementation here
+  });
+
+  const handleLiveChat = onLiveChat || (() => {
+    console.log('Live chat pressed');
+    // Add default implementation here
+  });
+
+  const handleBreakdown = onBreakdown || (() => {
+    console.log('Breakdown service pressed');
+    navigation.navigate('Breakdown');
+  });
+
+  const handleFuelDelivery = onFuelDelivery || (() => {
+    console.log('Fuel delivery service pressed');
+    // Add default implementation here
+  });
+
+  const handleTowing = onTowing || (() => {
+    console.log('Towing service pressed');
+    // Add default implementation here
+  });
+
+  const handleBattery = onBattery || (() => {
+    console.log('Battery service pressed');
+    // Add default implementation here
+  });
+
+  // Handle rating submission
+  const handleRatingSubmit = async (ratingSubmissionData) => {
+    try {
+      console.log('📋 Rating submission data:', ratingSubmissionData);
+      console.log('📋 Context rating data:', ratingData);
+      
+      // ratingSubmissionData contains { rating, comment } from RatingModal
+      // We need to merge it with the ratingData from context
+      const payload = {
+        request_id: ratingData.request_id,
+        mechanic_id: ratingData.mechanic_id,
+        mechanic_name: ratingData.mechanic_name,
+        service_type: ratingData.service_type,
+        user_name: ratingData.user_name,
+        user_phone: ratingData.user_phone,
+        car_details: ratingData.car_details,
+        breakdown_type: ratingData.breakdown_type,
+        rating: ratingSubmissionData.rating,
+        comment: ratingSubmissionData.comment
+      };
+
+      console.log('📤 Sending rating payload:', payload);
+      const response = await axios.post('http://10.0.2.2:8000/api/submit-rating/', payload);
+      
+      if (response.data.status === 'success') {
+        Alert.alert(
+          'Thank You!', 
+          'Your rating has been submitted successfully.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', response.data.error || 'Failed to submit rating');
+      }
+    } catch (error) {
+      console.error('Rating submission error:', error);
+      Alert.alert('Error', 'Failed to submit rating. Please try again.');
+    }
+    
+    // Close modal
+    closeRatingModal();
+  };
+
+  // Rating modal close handler is now managed by RatingContext
+
   // Filter mechanics
   const filteredMechanics = mechanicData.filter(
     m =>
@@ -119,6 +199,8 @@ const UserHome = ({
   const [recentMechanics, setRecentMechanics] = useState([]);
   const [isLoadingMechanics, setIsLoadingMechanics] = useState(false);
   const [spinnerAnim] = useState(new Animated.Value(0));
+
+  // Rating modal state is now managed by RatingContext
 
   // Debug: Log when assignedWorker changes
   useEffect(() => {
@@ -587,8 +669,6 @@ const UserHome = ({
     }
   }, [user?._id]);
 
-  const navigation = useNavigation();
-
   // Function to calculate distance between two coordinates
   const calculateDistance = (coord1, coord2) => {
     if (!coord1?.lat || !coord1?.lon || !coord2?.lat || !coord2?.lon) return 'N/A';
@@ -695,15 +775,7 @@ const UserHome = ({
             </View>
             <Text style={[styles.subGreeting, { color: theme.textSecondary }]}>Welcome back!</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.refreshButton} 
-            onPress={() => {
-              console.log('🔄 Manual refresh triggered');
-              fetchActiveRequest();
-            }}
-          >
-            <Text style={styles.refreshButtonText}>🔄</Text>
-          </TouchableOpacity>
+
           <TouchableOpacity style={styles.headerIconBtn}>
             <Image source={settingIcon} style={styles.headerImgIcon} />
           </TouchableOpacity>
@@ -967,12 +1039,12 @@ const UserHome = ({
           </View>
           <View style={styles.sectionDivider} />
           <View style={styles.quickServicesRow}>
-            <TouchableOpacity style={[styles.quickCard, styles.quickCardGreen]} onPress={onFastConnection}>
+            <TouchableOpacity style={[styles.quickCard, styles.quickCardGreen]} onPress={handleFastConnection}>
               <Image source={boltIcon} style={styles.quickServiceBoltIcon} />
               <Text style={styles.quickTitle}>Fast Connection</Text>
               <Text style={styles.quickDesc}>Quick mechanic match</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.quickCard, styles.quickCardBlue]} onPress={onLiveChat}>
+            <TouchableOpacity style={[styles.quickCard, styles.quickCardBlue]} onPress={handleLiveChat}>
               <Image source={messageIcon} style={styles.quickServiceMessageIcon} />
               <Text style={styles.quickTitle}>Live Chat & Call</Text>
               <Text style={styles.quickDesc}>Real-time support</Text>
@@ -988,34 +1060,35 @@ const UserHome = ({
           </View>
           <View style={styles.sectionDivider} />
           <View style={styles.servicesGrid}>
-            <TouchableOpacity style={styles.serviceCardModern} onPress={onBreakdown}>
+            <TouchableOpacity style={styles.serviceCardModern} onPress={handleBreakdown}>
               <View style={[styles.serviceIconCircle, { backgroundColor: '#FFB347' }]}> 
                 <Image source={serviceIcons.breakdown} style={styles.serviceIconModern} />
               </View>
               <Text style={styles.serviceTitleModern}>Breakdown</Text>
               <Text style={styles.serviceDescModern}>Car repair</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.serviceCardModern} onPress={onFuelDelivery}>
+            <TouchableOpacity style={styles.serviceCardModern} onPress={handleFuelDelivery}>
               <View style={[styles.serviceIconCircle, { backgroundColor: '#4ADE80' }]}> 
                 <Image source={serviceIcons.fuel} style={styles.serviceIconModern} />
               </View>
               <Text style={styles.serviceTitleModern}>Fuel Delivery</Text>
               <Text style={styles.serviceDescModern}>Emergency fuel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.serviceCardModern} onPress={onTowing}>
+            <TouchableOpacity style={styles.serviceCardModern} onPress={handleTowing}>
               <View style={[styles.serviceIconCircle, { backgroundColor: '#60A5FA' }]}> 
                 <Image source={serviceIcons.towing} style={styles.serviceIconModern} />
               </View>
               <Text style={styles.serviceTitleModern}>Towing</Text>
               <Text style={styles.serviceDescModern}>Vehicle towing</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.serviceCardModern} onPress={onBattery}>
+            <TouchableOpacity style={styles.serviceCardModern} onPress={handleBattery}>
               <View style={[styles.serviceIconCircle, { backgroundColor: '#F87171' }]}> 
                 <Image source={serviceIcons.battery} style={[styles.serviceIconModern,styles.batteryIcon]} />
               </View>
               <Text style={styles.serviceTitleModern}>Battery</Text>
               <Text style={styles.serviceDescModern}>Jump start</Text>
             </TouchableOpacity>
+
           </View>
         </View>
       </ScrollView>
@@ -1135,6 +1208,17 @@ const UserHome = ({
       )}
       
       <SOSButtonOverlay visible={sosVisible} onClose={() => setSosVisible(false)} />
+
+      {/* Rating Modal */}
+      <RatingModal
+        visible={showRatingModal}
+        onClose={closeRatingModal}
+        onSubmit={handleRatingSubmit}
+        mechanicName={ratingData?.mechanic_name}
+        serviceType={ratingData?.service_type}
+        workerName={ratingData?.worker_name}
+        garageName={ratingData?.garage_name}
+      />
     </View>
   );
 };

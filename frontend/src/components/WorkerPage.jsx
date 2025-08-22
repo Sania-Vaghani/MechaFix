@@ -8,13 +8,17 @@ import phoneIcon from '../images/phone.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import MapView, { Marker } from 'react-native-maps';
+import { useRating } from '../context/RatingContext';
+
 
 export default function WorkerPage() {
   const navigation = useNavigation();
+  const { triggerRatingModal } = useRating();
   const [mechanicId, setMechanicId] = useState(null);
   const [assignment, setAssignment] = useState(null);
   const [otp, setOtp] = useState(['', '', '', '']);
   const inputsRef = [useRef(null), useRef(null), useRef(null), useRef(null)];
+
 
   useEffect(() => {
     const init = async () => {
@@ -153,21 +157,30 @@ export default function WorkerPage() {
       console.log('📥 Response:', response.data);
       
       if (response.data.status === 'success') {
+        // After successful OTP verification, trigger rating modal on user side
+        // Clear the assignment and OTP
+        setAssignment(null);
+        setOtp(['', '', '', '']);
+        
+        // Trigger rating modal using context
+        triggerRatingModal({
+          request_id: assignment.id,
+          mechanic_id: assignment?.fullRequest?.assigned_worker?.worker_id || mechanicId,
+          mechanic_name: assignment?.fullRequest?.assigned_worker?.name || 'Service Provider',
+          service_type: assignment?.issue || 'Vehicle Repair',
+          user_name: assignment?.name,
+          user_phone: assignment?.phone,
+          car_details: assignment?.car,
+          breakdown_type: assignment?.issue,
+          worker_name: assignment?.fullRequest?.assigned_worker?.worker_name,
+          garage_name: assignment?.fullRequest?.assigned_worker?.garage_name
+        });
+        
+        // Show success message
         Alert.alert(
-          'Success!', 
-          'OTP verified and request marked as completed.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Clear the assignment and OTP
-                setAssignment(null);
-                setOtp(['', '', '', '']);
-                // Navigate back or show completion message
-                navigation.goBack();
-              }
-            }
-          ]
+          'Success!',
+          'OTP verified and request marked as completed. Rating modal will appear on user side.',
+          [{ text: 'OK' }]
         );
       } else {
         Alert.alert('Error', response.data.error || 'Failed to verify OTP');

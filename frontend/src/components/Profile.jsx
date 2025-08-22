@@ -136,6 +136,7 @@ const Profile = () => {
           <ProfileOption icon={emergencyIcon} label="Emergency Contacts" />
           <ProfileOption icon={padlockIcon} label="Modify Credentials" />
           <ProfileOption icon={historyIcon} label="Transaction History" />
+
           <ProfileOption icon={customerServiceIcon} label="Contact Us" />
           <ProfileOption icon={engineerIcon} label="Help and FAQs" isLast />
         </View>
@@ -150,7 +151,9 @@ const Profile = () => {
 };
 
 const ProfileOption = ({ icon, label, isLast }) => (
-  <TouchableOpacity style={[styles.optionRow, isLast && { borderBottomWidth: 0 }]}> 
+  <TouchableOpacity 
+    style={[styles.optionRow, isLast && { borderBottomWidth: 0 }]}
+  > 
     <Image source={icon} style={styles.optionIcon} />
     <Text style={styles.optionLabel}>{label}</Text>
     <Text style={styles.optionArrow}>{'>'}</Text>

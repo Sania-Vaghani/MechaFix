@@ -11,7 +11,7 @@ import os
 from dotenv import load_dotenv
 import pandas as pd
 import jwt
-from django.db import connection
+
 from django.conf import settings
 
 # Your recommendation import
@@ -1067,5 +1067,148 @@ def get_completed_requests(request):
 
     except Exception as e:
         print(f"❌ [get_completed_requests] Error: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# -----------------------------
+# API: Submit rating and comment for completed service
+# -----------------------------
+@csrf_exempt
+def submit_rating(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    try:
+        print(f"⭐ Rating submission request received: {request.body}")
+        data = json.loads(request.body)
+        print(f"📋 Parsed rating data: {data}")
+        
+        # Extract required fields
+        request_id = data.get('request_id')
+        mechanic_id = data.get('mechanic_id')
+        mechanic_name = data.get('mechanic_name')
+        service_type = data.get('service_type')
+        user_name = data.get('user_name')
+        user_phone = data.get('user_phone')
+        car_details = data.get('car_details')
+        breakdown_type = data.get('breakdown_type')
+        rating = data.get('rating')
+        comment = data.get('comment')
+        
+        # Validate required fields
+        if not all([request_id, mechanic_id, mechanic_name, rating, comment]):
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
+        
+        if not isinstance(rating, (int, float)) or rating < 1 or rating > 5:
+            return JsonResponse({'error': 'Rating must be between 1 and 5'}, status=400)
+        
+        if not isinstance(comment, str) or len(comment.strip()) < 3:
+            return JsonResponse({'error': 'Comment must be at least 3 characters'}, status=400)
+        
+        # Use the global MongoDB connection
+        # db is already defined at the top of the file
+        
+        # 1. Store rating in find_mech collection
+        find_mech_doc = {
+            'mech_name': mechanic_name,
+            'mech_lat': 23.027552,  # Default coordinates - can be updated later
+            'mech_long': 72.472305,
+            'rating': float(rating),
+            'comment': comment.strip(),
+            'breakdown_type': breakdown_type or 'general',
+            'selected': 1
+        }
+        
+        # Insert into find_mech collection
+        find_mech_result = db['find_mech'].insert_one(find_mech_doc)
+        print(f"📝 Rating stored in find_mech collection with ID: {find_mech_result.inserted_id}")
+        
+        # 2. Update mech_worker collection with rating
+        # First, try to find the worker in mech_worker collection
+        worker = None
+        worker_id = mechanic_id
+        
+        # Try to find worker by ID first
+        try:
+            worker = db['mech_worker'].find_one({'_id': ObjectId(mechanic_id)})
+        except:
+            pass
+        
+        # If not found in mech_worker, try to find by garage name in auth_mech
+        if not worker:
+            try:
+                garage_owner = db['auth_mech'].find_one({'_id': ObjectId(mechanic_id)})
+                if garage_owner and garage_owner.get('garage_name'):
+                    # Find any worker from this garage
+                    worker = db['mech_worker'].find_one({'garage_name': garage_owner['garage_name']})
+                    if worker:
+                        worker_id = str(worker['_id'])
+                        print(f"🔍 Found worker from garage: {worker['name']} (ID: {worker_id})")
+            except:
+                pass
+        
+        if worker:
+            # Calculate new average rating
+            current_ratings = worker.get('ratings', [])
+            current_ratings.append({
+                'rating': float(rating),
+                'comment': comment.strip(),
+                'user_name': user_name,
+                'service_type': service_type,
+                'request_id': request_id,
+                'created_at': datetime.utcnow()
+            })
+            
+            # Calculate average rating
+            total_rating = sum(r['rating'] for r in current_ratings)
+            average_rating = round(total_rating / len(current_ratings), 1)
+            
+            # Update worker document
+            update_result = db['mech_worker'].update_one(
+                {'_id': ObjectId(worker_id)},
+                {
+                    '$set': {
+                        'rating': average_rating,
+                        'total_ratings': len(current_ratings),
+                        'ratings': current_ratings
+                    }
+                }
+            )
+            
+            if update_result.modified_count > 0:
+                print(f"✅ Worker rating updated successfully. New average: {average_rating}")
+            else:
+                print(f"⚠️ Worker rating update may have failed")
+        else:
+            print(f"⚠️ Worker not found in mech_worker collection: {mechanic_id}")
+        
+        # 3. Update service_requests collection to mark as rated
+        service_update_result = db['service_requests'].update_one(
+            {'_id': ObjectId(request_id)},
+            {
+                '$set': {
+                    'rated': True,
+                    'rating': float(rating),
+                    'rating_comment': comment.strip(),
+                    'rated_at': datetime.utcnow()
+                }
+            }
+        )
+        
+        if service_update_result.modified_count > 0:
+            print(f"✅ Service request marked as rated")
+        else:
+            print(f"⚠️ Service request rating update may have failed")
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Rating submitted successfully',
+            'rating_id': str(find_mech_result.inserted_id),
+            'average_rating': worker.get('rating') if worker else None
+        })
+        
+    except Exception as e:
+        print(f"❌ Error in rating submission: {str(e)}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
         return JsonResponse({'error': str(e)}, status=500)
 

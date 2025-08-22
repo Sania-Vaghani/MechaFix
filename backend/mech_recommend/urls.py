@@ -18,4 +18,5 @@ urlpatterns = [
     path('api/service-requests/recent/', views.get_recent_requests, name='get_recent_requests'),
 
     path('api/service-requests/completed/', views.get_completed_requests, name='get_completed_requests'),
+    path('api/submit-rating/', views.submit_rating, name='submit_rating'),
 ]

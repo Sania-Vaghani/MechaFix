@@ -9,6 +9,7 @@ import SignUp from './src/components/SignUp';
 import CreatePassword from './src/components/CreatePassword';
 import UserHome from './src/components/UserHome';
 import { UserTypeProvider, UserTypeContext } from './src/context/UserTypeContext';
+import { RatingProvider } from './src/context/RatingContext';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Messages from './src/components/Messages';
 import Profile from './src/components/Profile';
@@ -112,29 +113,31 @@ export default function App() {
   return (
     <ErrorBoundary>
     <UserTypeProvider>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Splash" component={SplashScreen} />
-          <Stack.Screen name="UserTypeSelection" component={UserTypeSelection} />
-          <Stack.Screen name="Login" component={Login} />
-          <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-            <Stack.Screen name="Logout" component={LogoutScreen} />
-          <Stack.Screen name="SignUp" component={SignUp} />
-          <Stack.Screen name="Otp" component={OtpScreen} />
-          <Stack.Screen name="PhoneNum" component={PhoneNum} />
-          <Stack.Screen name="CreatePassword" component={CreatePassword} />
-          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-          <Stack.Screen name="ForgotPasswordOtp" component={ForgotPasswordOtpScreen} />
-          <Stack.Screen name="FullMap" component={FullMapScreen} />
-          <Stack.Screen name="FoundMechanic" component={FoundMechanic} />
-            <Stack.Screen name="UserDetail" component={UserDetail} /> 
-            <Stack.Screen name="WorkerPage" component={WorkerPage} /> 
-            <Stack.Screen name="AssignedMech" component={AssignedMech} />
-            <Stack.Screen name="TrackingMap" component={TrackingMap} />
+      <RatingProvider>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Splash" component={SplashScreen} />
+            <Stack.Screen name="UserTypeSelection" component={UserTypeSelection} />
+            <Stack.Screen name="Login" component={Login} />
+            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+              <Stack.Screen name="Logout" component={LogoutScreen} />
+            <Stack.Screen name="SignUp" component={SignUp} />
+            <Stack.Screen name="Otp" component={OtpScreen} />
+            <Stack.Screen name="PhoneNum" component={PhoneNum} />
+            <Stack.Screen name="CreatePassword" component={CreatePassword} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <Stack.Screen name="ForgotPasswordOtp" component={ForgotPasswordOtpScreen} />
+            <Stack.Screen name="FullMap" component={FullMapScreen} />
+            <Stack.Screen name="FoundMechanic" component={FoundMechanic} />
+              <Stack.Screen name="UserDetail" component={UserDetail} /> 
+              <Stack.Screen name="WorkerPage" component={WorkerPage} /> 
+              <Stack.Screen name="AssignedMech" component={AssignedMech} />
+              <Stack.Screen name="TrackingMap" component={TrackingMap} />
 
-            <Stack.Screen name="CustomerHistory" component={CustomerHistory} />
-          </Stack.Navigator>
-        </NavigationContainer>
+              <Stack.Screen name="CustomerHistory" component={CustomerHistory} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </RatingProvider>
       </UserTypeProvider>
     </ErrorBoundary>
   );
