@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   mechName: { fontSize: 20, fontWeight: 'bold', color: '#22223B', marginBottom: 6 },
   detail: { fontSize: 16, color: '#444', marginBottom: 2 },
   sendBtn: {
-    backgroundColor: '#ff5c5c', borderRadius: 12, paddingVertical: 12, alignItems: 'center',
+    backgroundColor: '#3B82F6', borderRadius: 12, paddingVertical: 12, alignItems: 'center',
     marginTop: 10, shadowColor: '#ff5c5c', elevation: 2,
   },
   sendBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },

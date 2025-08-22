@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, StatusBar } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -110,9 +110,14 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
       transparent={true}
       animationType="slide"
       onRequestClose={onClose}
+      statusBarTranslucent={true}
     >
+      <StatusBar backgroundColor="rgba(0,0,0,0.75)" barStyle="light-content" translucent />
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
+          {/* Bottom Handle Indicator */}
+          <View style={styles.bottomHandle} />
+          
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Assign Worker</Text>
@@ -179,28 +184,37 @@ const WorkerAssignmentModal = ({ visible, onClose, requestId, onWorkerAssigned }
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.50)',
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    paddingTop: 0, // Cover the entire screen including camera area
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    width: '90%',
-    maxHeight: '80%',
-    shadowColor: '#000',
+    borderRadius: 32,
+    width: '95%',
+    maxHeight: '85%',
+    shadowColor: '#FF4D4F',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 8,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 77, 79, 0.08)',
+    marginTop: 130, // Reduced from 100 to better position content
+  },
+  bottomHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 12,
   },
   header: {
     flexDirection: 'row',
@@ -209,63 +223,90 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    marginBottom: 8,
+    paddingHorizontal: 20,
+    position: 'relative',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    fontFamily: 'Poppins-SemiBold',
+    fontSize: 28,
+    color: '#22223B',
+    fontFamily: 'Cormorant-Bold',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    zIndex: 1,
   },
   closeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   closeButtonText: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 24,
+    color: '#374151',
     fontWeight: 'bold',
+    lineHeight: 24,
   },
   content: {
-    padding: 20,
+    padding: 24,
   },
   loadingContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 60,
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
+    marginTop: 16,
+    fontSize: 18,
     color: '#6B7280',
     fontFamily: 'Poppins-Regular',
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 60,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 20,
     color: '#374151',
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 12,
     fontFamily: 'Poppins-SemiBold',
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#6B7280',
     textAlign: 'center',
     fontFamily: 'Poppins-Regular',
+    lineHeight: 22,
   },
   workerCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   workerInfo: {
     flex: 1,
@@ -309,19 +350,29 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
   },
   assignButton: {
-    backgroundColor: '#10B981',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    backgroundColor: '#3B82F6',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 16,
+    shadowColor: '#10B981',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
   assignButtonDisabled: {
     backgroundColor: '#9CA3AF',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   assignButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
     fontFamily: 'Poppins-SemiBold',
   },

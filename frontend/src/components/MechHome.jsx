@@ -555,7 +555,7 @@ export default function MechHome() {
           </View>
         </View>
         {/* Recent Requests */}
-        <View style={styles.sectionCard}>
+        <View style={styles.recentRequestsSection}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <Text style={styles.sectionTitle}>Recent Requests</Text>
             {isLoading && (
@@ -672,10 +672,9 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   statusTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 24,
     color: '#22223B',
-    fontFamily: 'Poppins-Bold',
+    fontFamily: 'Cormorant-Bold',
   },
   statusDot: {
     width: 10,
@@ -760,10 +759,9 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 24,
     color: '#22223B',
-    fontFamily: 'Poppins-Bold',
+    fontFamily: 'Cormorant-Bold',
     marginBottom: 10,
   },
   serviceCard: {
@@ -791,7 +789,7 @@ const styles = StyleSheet.create({
   overviewRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 10,
+    marginTop: -5,
     marginBottom: 10,
   },
   overviewItem: {
@@ -822,9 +820,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
-    backgroundColor: '#f7fafc',
-    borderRadius: 10,
-    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   requestAvatar: {
     width: 38,
@@ -886,5 +890,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     fontFamily: 'Poppins-Regular',
+  },
+  recentRequestsSection: {
+    marginBottom: 18,
   },
 });

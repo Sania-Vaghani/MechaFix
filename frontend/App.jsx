@@ -133,7 +133,6 @@ export default function App() {
               <Stack.Screen name="WorkerPage" component={WorkerPage} /> 
               <Stack.Screen name="AssignedMech" component={AssignedMech} />
               <Stack.Screen name="TrackingMap" component={TrackingMap} />
-
               <Stack.Screen name="CustomerHistory" component={CustomerHistory} />
             </Stack.Navigator>
           </NavigationContainer>

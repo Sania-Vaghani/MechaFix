@@ -241,16 +241,6 @@ export default function CustomerHistory() {
     setRefreshing(false);
   };
 
-  const handleCall = (phone) => {
-    // Handle phone call
-    console.log('Calling:', phone);
-  };
-
-  const handleMessage = (phone) => {
-    // Handle message
-    console.log('Messaging:', phone);
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -298,19 +288,15 @@ export default function CustomerHistory() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={['#FF4D4F', '#FF7875']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image source={backArrowIcon} style={styles.backIcon} />
+      {/* Header - Styled like SOS header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backArrow} onPress={() => navigation.goBack()}>
+          <Image source={backArrowIcon} style={styles.backArrowIcon} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Customer History</Text>
-        <View style={styles.placeholder} />
-      </LinearGradient>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Customer History</Text>
+        </View>
+      </View>
 
       <ScrollView 
         contentContainerStyle={styles.content} 
@@ -324,7 +310,7 @@ export default function CustomerHistory() {
           <Text style={styles.statsTitle}>Service Overview</Text>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <View style={[styles.statCircle, { backgroundColor: '#FF4D4F' }]}>
+              <View style={[styles.statCircle, { backgroundColor: '#3B82F6' }]}>
                 <Text style={styles.statNumber}>{stats.total}</Text>
               </View>
               <Text style={styles.statLabel}>Total Services</Text>
@@ -354,8 +340,8 @@ export default function CustomerHistory() {
           </View>
         )}
 
-        {/* Customer History List */}
-        <View style={styles.historyCard}>
+        {/* Customer History List - Individual Cards */}
+        <View style={styles.historySection}>
           <Text style={styles.historyTitle}>Recent Services</Text>
           
           {customerHistory.length === 0 ? (
@@ -365,7 +351,8 @@ export default function CustomerHistory() {
             </View>
           ) : (
             customerHistory.map((customer, index) => (
-              <View key={customer._id || index} style={styles.customerItem}>
+              <View key={customer._id || index} style={styles.customerCard}>
+                {/* Customer Header */}
                 <View style={styles.customerHeader}>
                   <View style={styles.customerAvatar}>
                     <Text style={styles.avatarText}>
@@ -381,28 +368,18 @@ export default function CustomerHistory() {
                       {customer.breakdown_type || 'Unknown Issue'}
                     </Text>
                   </View>
-                  <View style={styles.customerActions}>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => handleCall(customer.user_phone)}
-                    >
-                      <Image source={phoneIcon} style={styles.actionIcon} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => handleMessage(customer.user_phone)}
-                    >
-                      <Image source={messageIcon} style={styles.actionIcon} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                
-                <View style={styles.customerDetails}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Status:</Text>
+                  <View style={styles.statusContainer}>
                     <View style={[styles.statusBadge, { backgroundColor: getStatusColor(customer.status) }]}>
                       <Text style={styles.statusText}>{getStatusText(customer.status)}</Text>
                     </View>
+                  </View>
+                </View>
+                
+                {/* Customer Details */}
+                <View style={styles.customerDetails}>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Distance:</Text>
+                    <Text style={styles.detailValue}>{customer.distance}</Text>
                   </View>
                   
                   <View style={styles.detailRow}>
@@ -411,20 +388,6 @@ export default function CustomerHistory() {
                       {formatDate(customer.completed_at)}
                     </Text>
                   </View>
-                  
-                  {customer.mechanic_name && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Mechanic:</Text>
-                      <Text style={styles.detailValue}>{customer.mechanic_name}</Text>
-                    </View>
-                  )}
-                  
-                  {customer.total_amount && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Amount:</Text>
-                      <Text style={styles.detailValue}>₹{customer.total_amount}</Text>
-                    </View>
-                  )}
                 </View>
               </View>
             ))
@@ -450,61 +413,66 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#6B7280',
+    fontFamily: 'Poppins-Regular',
   },
+  // Header styled like SOS header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    backgroundColor: '#FF4D4F',
+    paddingTop: 56,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    shadowColor: '#FF4D4F',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  backArrow: {
+    marginRight: 10,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 4,
+  },
+  backArrowIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+    tintColor: '#FF4D4F',
+  },
+  headerTitleContainer: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIcon: {
-    width: 18,
-    height: 18,
-    tintColor: '#fff',
-    resizeMode: 'contain',
-  },
   headerTitle: {
-    color: '#fff',
     fontSize: 28,
-    fontWeight: '600',
+    color: '#fff',
     fontFamily: 'Cormorant-Bold',
     textAlign: 'center',
   },
-  placeholder: {
-    width: 40,
-  },
   content: {
-    padding: 16,
+    padding: 18,
     paddingBottom: 40,
+    paddingTop: 20,
   },
   statsCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 4,
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 18,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   statsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 20,
+    fontSize: 26,
+    color: '#22223B',
+    fontFamily: 'Cormorant-Bold',
+    marginBottom: 18,
     textAlign: 'center',
   },
   statsRow: {
@@ -526,64 +494,55 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
+    fontFamily: 'Poppins-Bold',
   },
   statLabel: {
     fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
+    fontFamily: 'Poppins-Regular',
   },
-  historyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+  historySection: {
+    marginBottom: 18,
   },
   historyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 20,
+    fontSize: 26,
+    color: '#22223B',
+    fontFamily: 'Cormorant-Bold',
+    marginBottom: 18,
   },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#9CA3AF',
-  },
-  customerItem: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    paddingVertical: 16,
+  // Individual customer cards
+  customerCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   customerHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   customerAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#8B5CF6',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#C189FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   avatarText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
+    fontFamily: 'Poppins-Bold',
   },
   customerInfo: {
     flex: 1,
@@ -593,38 +552,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: 4,
+    fontFamily: 'Poppins-SemiBold',
   },
   customerCar: {
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 2,
+    fontFamily: 'Poppins-Regular',
   },
   customerIssue: {
     fontSize: 14,
     color: '#374151',
     fontWeight: '500',
+    fontFamily: 'Poppins-Medium',
   },
-  customerActions: {
-    flexDirection: 'row',
-    gap: 8,
+  statusContainer: {
+    alignItems: 'flex-end',
   },
-  actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  actionIcon: {
-    width: 18,
-    height: 18,
-    tintColor: '#6B7280',
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
   },
   customerDetails: {
     backgroundColor: '#F9FAFB',
-    borderRadius: 8,
+    borderRadius: 10,
     padding: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginBottom: 16,
   },
   detailRow: {
     flexDirection: 'row',
@@ -636,36 +598,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
+    fontFamily: 'Poppins-Medium',
   },
   detailValue: {
     fontSize: 14,
     color: '#1F2937',
     fontWeight: '500',
+    fontFamily: 'Poppins-Medium',
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
   },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+  emptyText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 8,
+    fontFamily: 'Poppins-Regular',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontFamily: 'Poppins-Regular',
   },
   errorCard: {
-    backgroundColor: '#FFE5E5',
+    backgroundColor: '#FEF2F2',
     borderRadius: 12,
     padding: 15,
-    marginBottom: 20,
+    marginBottom: 18,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#FF6B6B',
+    borderColor: '#FECACA',
   },
   errorText: {
-    color: '#FF6B6B',
+    color: '#DC2626',
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 10,
+    fontFamily: 'Poppins-Medium',
   },
   retryButton: {
     backgroundColor: '#FF4D4F',
@@ -677,5 +647,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
   },
 }); 
