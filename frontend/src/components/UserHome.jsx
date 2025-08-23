@@ -821,9 +821,11 @@ const UserHome = ({
                   user_phone: request.user_phone,
                   car_details: `${request.car_model || ''} ${request.year || ''} ${request.license_plate || ''}`.trim(),
                   breakdown_type: request.breakdown_type,
-                  worker_name: completedMechanic?.mech_name,
+                  worker_name: completedMechanic?.mech_name || completedMechanic?.name || 'Service Provider',
                   garage_name: completedMechanic?.garage_name || 'Garage'
                 };
+                
+                console.log('📋 [UserHome] Rating data being sent:', ratingData);
                 
                 triggerRatingModal(ratingData);
                 setAssignedWorker(null);
@@ -869,9 +871,11 @@ const UserHome = ({
                 user_phone: request.user_phone,
                 car_details: `${request.car_model || ''} ${request.year || ''} ${request.license_plate || ''}`.trim(),
                 breakdown_type: request.breakdown_type,
-                worker_name: completedMechanic?.mech_name,
+                worker_name: completedMechanic?.mech_name || completedMechanic?.name || 'Service Provider',
                 garage_name: completedMechanic?.garage_name || 'Garage'
               };
+              
+              console.log('📋 [UserHome] Rating data being sent (method 2):', ratingData);
               
               triggerRatingModal(ratingData);
               setAssignedWorker(null);

@@ -92,21 +92,16 @@ export default function RatingModal({ visible, onClose, onSubmit, mechanicName, 
             {/* Service Info Card */}
             <View style={styles.infoCard}>
               <Text style={styles.serviceInfo}>
-                Service: {serviceType || 'Vehicle Repair'}
+                Service: {serviceType || 'Completed'}
               </Text>
               {workerName && (
                 <Text style={styles.mechanicInfo}>
                   Worker: {workerName}
                 </Text>
               )}
-              {garageName && (
+              {!workerName && (
                 <Text style={styles.mechanicInfo}>
-                  Garage: {garageName}
-                </Text>
-              )}
-              {!workerName && !garageName && (
-                <Text style={styles.mechanicInfo}>
-                  Mechanic: {mechanicName || 'Service Provider'}
+                  Worker: {mechanicName || 'Service Provider'}
                 </Text>
               )}
             </View>
@@ -210,29 +205,30 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F3F4F6',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FF4D4F',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
     alignSelf: 'flex-end',
+    zIndex: 10,
   },
   closeButtonText: {
-    fontSize: 20,
-    color: '#374151',
+    fontSize: 24,
+    color: '#FFFFFF',
     fontWeight: 'bold',
-    lineHeight: 20,
+    lineHeight: 24,
   },
   content: {
     padding: 24,
