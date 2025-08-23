@@ -294,7 +294,7 @@ export default function CustomerHistory() {
           <Image source={backArrowIcon} style={styles.backArrowIcon} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Customer History</Text>
+        <Text style={styles.headerTitle}>Customer History</Text>
         </View>
       </View>
 

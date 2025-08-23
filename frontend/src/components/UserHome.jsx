@@ -81,7 +81,7 @@ const UserHome = ({
  
   const theme = lightTheme;
   const navigation = useNavigation();
-  const { showRatingModal, ratingData, closeRatingModal } = useRating();
+  const { showRatingModal, ratingData, closeRatingModal, triggerRatingModal } = useRating();
 
   // Search state
   const [search, setSearch] = useState('');
@@ -161,6 +161,12 @@ const UserHome = ({
       const response = await axios.post('http://10.0.2.2:8000/api/submit-rating/', payload);
       
       if (response.data.status === 'success') {
+        // Mark this request as rated to prevent modal from opening again
+        if (ratingData.request_id) {
+          await AsyncStorage.setItem(`rated_${ratingData.request_id}`, 'true');
+          console.log('✅ [UserHome] Marked request as rated:', ratingData.request_id);
+        }
+        
         Alert.alert(
           'Thank You!', 
           'Your rating has been submitted successfully.',
@@ -179,6 +185,29 @@ const UserHome = ({
   };
 
   // Rating modal close handler is now managed by RatingContext
+  
+  // Enhanced close handler to mark as rated if user closes without rating
+  const handleRatingModalClose = () => {
+    // If user closes modal without rating, mark as rated to prevent re-opening
+    if (ratingData?.request_id) {
+      AsyncStorage.setItem(`rated_${ratingData.request_id}`, 'true');
+      console.log('🚫 [UserHome] User closed rating modal, marking as rated to prevent re-opening');
+    }
+    closeRatingModal();
+  };
+  
+  // Function to clear rated status (for testing purposes)
+  const clearRatedStatus = async () => {
+    try {
+      const lastRequestId = await AsyncStorage.getItem('lastRequestId');
+      if (lastRequestId) {
+        await AsyncStorage.removeItem(`rated_${lastRequestId}`);
+        console.log('🧹 [UserHome] Cleared rated status for request:', lastRequestId);
+      }
+    } catch (error) {
+      console.log('❌ [UserHome] Error clearing rated status:', error);
+    }
+  };
 
   // Filter mechanics logic moved to onChangeText and onFocus handlers
 
@@ -743,6 +772,135 @@ const UserHome = ({
     }
   }, [isLoadingMechanics]);
 
+  // Add polling for completed services to show rating modal
+  useEffect(() => {
+    const checkForCompletedServices = async () => {
+      try {
+        const token = await AsyncStorage.getItem('jwtToken');
+        if (!token) return;
+
+        console.log('🔄 [UserHome] Checking for completed services...', { 
+          showRatingModal, 
+          hasRatingData: !!ratingData, 
+          userId: user?._id 
+        });
+        
+        // Method 1: Check lastRequestId from storage
+        const lastRequestId = await AsyncStorage.getItem('lastRequestId');
+        console.log('🔍 [UserHome] Checking lastRequestId:', lastRequestId);
+        if (lastRequestId) {
+          try {
+            const response = await API.get(`request-detail/${lastRequestId}/`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (response?.data?.status === 'success' && response?.data?.request) {
+              const request = response.data.request;
+              
+              // Check if any mechanic has completed this request
+              const hasCompletedMechanic = Array.isArray(request.mechanics_list) && 
+                request.mechanics_list.some(m => m.status === 'completed');
+              
+              // Check if this request has already been rated
+              const alreadyRated = await AsyncStorage.getItem(`rated_${lastRequestId}`);
+              console.log('🔍 [UserHome] Request already rated?', { requestId: lastRequestId, alreadyRated: !!alreadyRated });
+              
+              if (hasCompletedMechanic && !showRatingModal && !ratingData && !alreadyRated) {
+                console.log('✅ [UserHome] Found completed service via lastRequestId, triggering rating modal');
+                
+                // Find the completed mechanic
+                const completedMechanic = request.mechanics_list.find(m => m.status === 'completed');
+                
+                // Trigger rating modal with service data
+                const ratingData = {
+                  request_id: request._id,
+                  mechanic_id: completedMechanic?.mech_id || 'unknown',
+                  mechanic_name: completedMechanic?.mech_name || 'Service Provider',
+                  service_type: request.breakdown_type || 'Vehicle Repair',
+                  user_name: request.user_name,
+                  user_phone: request.user_phone,
+                  car_details: `${request.car_model || ''} ${request.year || ''} ${request.license_plate || ''}`.trim(),
+                  breakdown_type: request.breakdown_type,
+                  worker_name: completedMechanic?.mech_name,
+                  garage_name: completedMechanic?.garage_name || 'Garage'
+                };
+                
+                triggerRatingModal(ratingData);
+                setAssignedWorker(null);
+                return;
+              }
+            }
+          } catch (error) {
+            console.log('❌ [UserHome] Error checking lastRequestId:', error);
+          }
+        }
+
+        // Method 2: Check user's active request endpoint
+        console.log('🔍 [UserHome] Checking user-active-request for user:', user?._id);
+        try {
+          const uaResponse = await API.get(`user-active-request/?user_id=${user?._id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (uaResponse?.data?.status === 'success' && uaResponse?.data?.request) {
+            const request = uaResponse.data.request;
+            
+            // Check if any mechanic has completed this request
+            const hasCompletedMechanic = Array.isArray(request.mechanics_list) && 
+              request.mechanics_list.some(m => m.status === 'completed');
+            
+            // Check if this request has already been rated
+            const alreadyRated = await AsyncStorage.getItem(`rated_${request._id}`);
+            console.log('🔍 [UserHome] Request already rated?', { requestId: request._id, alreadyRated: !!alreadyRated });
+            
+            if (hasCompletedMechanic && !showRatingModal && !ratingData && !alreadyRated) {
+              console.log('✅ [UserHome] Found completed service via user-active-request, triggering rating modal');
+              
+              // Find the completed mechanic
+              const completedMechanic = request.mechanics_list.find(m => m.status === 'completed');
+              
+              // Trigger rating modal with service data
+              const ratingData = {
+                request_id: request._id,
+                mechanic_id: completedMechanic?.mech_id || 'unknown',
+                mechanic_name: completedMechanic?.mech_name || 'Service Provider',
+                service_type: request.breakdown_type || 'Vehicle Repair',
+                user_name: request.user_name,
+                user_phone: request.user_phone,
+                car_details: `${request.car_model || ''} ${request.year || ''} ${request.license_plate || ''}`.trim(),
+                breakdown_type: request.breakdown_type,
+                worker_name: completedMechanic?.mech_name,
+                garage_name: completedMechanic?.garage_name || 'Garage'
+              };
+              
+              triggerRatingModal(ratingData);
+              setAssignedWorker(null);
+              return;
+            }
+          }
+        } catch (error) {
+          console.log('❌ [UserHome] Error checking user-active-request:', error);
+        }
+
+      } catch (error) {
+        console.log('❌ [UserHome] Error checking for completed services:', error);
+      }
+    };
+
+    // Check immediately when component mounts
+    checkForCompletedServices();
+    
+    // Then poll every 15 seconds for updates
+    const interval = setInterval(checkForCompletedServices, 15000);
+    
+    console.log('🔄 [UserHome] Started polling for completed services every 15 seconds');
+    
+    return () => {
+      clearInterval(interval);
+      console.log('🔄 [UserHome] Stopped polling for completed services');
+    };
+  }, [showRatingModal, triggerRatingModal, user?._id]);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#F6F8FF' }}>
       {/* Search Overlay for blur/black transparent effect */}
@@ -1224,12 +1382,13 @@ const UserHome = ({
       {/* Rating Modal */}
       <RatingModal
         visible={showRatingModal}
-        onClose={closeRatingModal}
+        onClose={handleRatingModalClose}
         onSubmit={handleRatingSubmit}
         mechanicName={ratingData?.mechanic_name}
         serviceType={ratingData?.service_type}
         workerName={ratingData?.worker_name}
         garageName={ratingData?.garage_name}
+        requestId={ratingData?.request_id}
       />
     </View>
   );
